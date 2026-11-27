@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "data_date": "2026-11-28",
+  "producer": "fetch_limitup_cloud.py",
+  "adj": "none",
+  "data_source": "ths_dataapi",
+  "run_status": "complete",
+  "counts": {
+    "limit_up": 0,
+    "zhaban": 0,
+    "limit_down": 0
+  },
+  "stocks": []
+}
