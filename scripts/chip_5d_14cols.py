@@ -808,7 +808,37 @@ updatedAt.textContent = DATA.generated_at || '—';
 latestDate.textContent = (DATA.dates && DATA.dates.length) ? DATA.dates[DATA.dates.length - 1] : '—';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 function setUpdateMsg(t) { updateMsg.textContent = t; }
-async function pollUpdate(runId) {
+async function pageEtag() {
+  try {
+    const r = await fetch(location.pathname, { method: 'HEAD', cache: 'no-store' });
+    return r.headers.get('etag') || r.headers.get('last-modified') || '';
+  } catch (e) {
+    return '';
+  }
+}
+async function waitForDeploy(beforeEtag) {
+  if (!beforeEtag) {
+    setUpdateMsg('更新完成，正在加载最新页面…');
+    await sleep(30000);
+    location.replace(location.pathname + '?v=' + Date.now());
+    return;
+  }
+  for (let i = 0; i < 24; i++) {
+    await sleep(5000);
+    const nowEtag = await pageEtag();
+    if (nowEtag && nowEtag !== beforeEtag) {
+      setUpdateMsg('更新完成，正在加载最新页面…');
+      await sleep(8000);
+      location.replace(location.pathname + '?v=' + Date.now());
+      return;
+    }
+    setUpdateMsg(`更新完成，等待页面部署…（${i + 1}/24）`);
+  }
+  setUpdateMsg('更新任务已完成，但页面尚未切换，请稍后手动刷新');
+  refreshBtn.disabled = false;
+  refreshBtn.textContent = '立即更新';
+}
+async function pollUpdate(runId, beforeEtag) {
   for (let i = 0; i < 120; i++) {
     await sleep(5000);
     let s;
@@ -822,10 +852,7 @@ async function pollUpdate(runId) {
     }
     if (s.status === 'completed') {
       if (s.conclusion === 'success') {
-        setUpdateMsg('更新完成，正在加载最新页面…');
-        await sleep(10000);
-        location.replace(location.pathname + '?v=' + Date.now());
-        return;
+        return waitForDeploy(beforeEtag);
       }
       setUpdateMsg(`更新失败（${s.conclusion || '未知原因'}），请稍后重试`);
       refreshBtn.disabled = false;
@@ -843,6 +870,7 @@ async function startUpdate() {
   refreshBtn.disabled = true;
   refreshBtn.textContent = '更新中…';
   setUpdateMsg('正在请求云端更新全部数据…');
+  const beforeEtag = await pageEtag();
   try {
     const r = await fetch(`${UPDATE_API}/update`, {
       method: 'POST',
@@ -854,13 +882,13 @@ async function startUpdate() {
     if (!r.ok || !res.ok) {
       if (res.error === 'running' && res.run && res.run.id) {
         setUpdateMsg('云端正在更新，等待完成…');
-        return pollUpdate(res.run.id);
+        return pollUpdate(res.run.id, beforeEtag);
       }
       throw new Error(res.message || res.error || `HTTP ${r.status}`);
     }
     if (res.run && res.run.id) {
       setUpdateMsg('已提交更新任务，等待云端执行…');
-      return pollUpdate(res.run.id);
+      return pollUpdate(res.run.id, beforeEtag);
     }
     setUpdateMsg('已提交更新任务，请稍后刷新页面');
     refreshBtn.disabled = false;
