@@ -11,7 +11,7 @@ A股五日筹码可视化页面，数据由 GitHub Actions 自动更新，不依
 `.github/workflows/update.yml` 每个工作日北京时间 16:10 运行：
 
 1. `scripts/fetch_limitup_cloud.py` 用同花顺涨停池接口生成当日 `data/<日期>/01_stocks_raw_<日期>.json`；
-2. `scripts/update_pool_db.py` 用同花顺日 K 给 `data/pool_quant.db` 追加新交易日，不改已有历史；
+2. `scripts/update_pool_db.py` 用同花顺日 K + 腾讯盘后快照给 `data/pool_quant.db` 追加新交易日，不改已有历史；
 3. `scripts/chip_6d_html.py` 重算最近 6 个交易日的筹码分布，写 `data/chip_6d_data.json`；
 4. `scripts/chip_5d_14cols.py` 生成 `index.html`；
 5. Actions 自动提交并推送，GitHub Pages 重建。

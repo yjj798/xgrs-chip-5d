@@ -18,6 +18,7 @@ import requests
 BASE = Path(__file__).resolve().parents[1]
 DB = Path(os.environ.get("POOL_DB", str(BASE / "data" / "pool_quant.db")))
 KLINE_URL = "https://d.10jqka.com.cn/v6/line/hs_{code}/01/last.js"
+TENCENT_URL = "https://qt.gtimg.cn/q={q}"
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 REFERER = "https://data.10jqka.com.cn/datacenterph/limitup/limtupInfo.html"
 
@@ -65,6 +66,43 @@ def fetch_kline(code: str) -> list[dict]:
     raise RuntimeError(f"{code} K线失败: {last_err}")
 
 
+def fetch_tencent_quotes(codes: list[str]) -> dict[str, dict]:
+    """腾讯盘后快照，作为当日 OHLCV 的最终值；同花顺 last.js 偶发半日快照。"""
+    out: dict[str, dict] = {}
+    for start in range(0, len(codes), 60):
+        batch = codes[start:start + 60]
+        q = ",".join(("sh" if c.startswith("6") else "sz") + c for c in batch)
+        try:
+            r = requests.get(TENCENT_URL.format(q=q), headers={"User-Agent": UA}, timeout=20)
+            text = r.content.decode("gbk", errors="ignore")
+        except Exception as exc:  # noqa: BLE001
+            print(f"  [腾讯行情失败] {exc}")
+            continue
+        for line in text.split(";"):
+            if '="' not in line:
+                continue
+            body = line.split('="', 1)[1].rstrip('"')
+            f = body.split("~")
+            if len(f) < 39:
+                continue
+            code = f[2].strip()
+            ts = f[30].strip()
+            if len(ts) != 14 or not ts.isdigit():
+                continue
+            d = ts[:8]
+            close, open_, high, low = _num(f[3]), _num(f[5]), _num(f[33]), _num(f[34])
+            vol, amt_wan, turn = _num(f[6]), _num(f[37]), _num(f[38])
+            if not all(x and x > 0 for x in (close, open_, high, low, vol)):
+                continue
+            out[code] = {
+                "date": d, "open": open_, "high": high, "low": low, "close": close,
+                "volume": vol, "amount": (amt_wan * 10000.0 if amt_wan else None),
+                "turnover": turn, "source": "tencent_quote",
+            }
+        time.sleep(0.2)
+    return out
+
+
 def main() -> int:
     if not DB.exists():
         raise SystemExit(f"缺少数据库 {DB}")
@@ -73,14 +111,19 @@ def main() -> int:
     max_date = con.execute("select max(trade_date) from quote_clean").fetchone()[0]
     pool = {r["code"]: (r["name"] or "", r["board"] or "") for r in con.execute("select code,name,board from pool_quotes")}
     last = {}
+    code_max = {}
     for r in con.execute(
-        "select code,close,circ_mv_est,circ_mv,turnover_est from quote_clean "
-        "where trade_date=(select max(trade_date) from quote_clean)"
+        "select code,close,circ_mv_est,circ_mv,turnover_est,trade_date from quote_clean q "
+        "where trade_date=(select max(trade_date) from quote_clean q2 where q2.code=q.code)"
     ):
         last[r["code"]] = dict(r)
+    for r in con.execute("select code,max(trade_date) as d from quote_clean group by code"):
+        code_max[r["code"]] = r["d"]
     con.close()
 
     print(f"DB最新 {max_date}，股票 {len(pool)} 只，开始拉取日K")
+    quotes = fetch_tencent_quotes(list(pool))
+    print(f"腾讯盘后快照 {len(quotes)} 只")
     fetched = {}
     failed = []
     with ThreadPoolExecutor(max_workers=6) as ex:
@@ -91,12 +134,13 @@ def main() -> int:
                 fetched[code] = f.result()
             except Exception as exc:  # noqa: BLE001
                 failed.append(code)
+                fetched[code] = []
                 print(f"  [失败] {code}: {exc}")
             if i % 50 == 0:
                 print(f"  进度 {i}/{len(pool)}")
 
-    if failed and len(failed) > len(pool) * 0.15:
-        raise SystemExit(f"K线失败过多 {len(failed)}/{len(pool)}，停止更新")
+    if failed and len(failed) > len(pool) * 0.15 and len(quotes) < len(pool) * 0.85:
+        raise SystemExit(f"K线失败过多 {len(failed)}/{len(pool)}，腾讯快照 {len(quotes)}，停止更新")
 
     con = sqlite3.connect(DB)
     inserted = 0
@@ -108,7 +152,10 @@ def main() -> int:
         base_cmv = _num(base.get("circ_mv_est")) or _num(base.get("circ_mv"))
         float_shares = (base_cmv / base_close) if (base_cmv and base_close) else None
         is_st = 1 if re.search(r"ST", name, re.I) else 0
-        new_rows = [x for x in rows if x["date"] > (max_date or "00000000")]
+        q = quotes.get(code)
+        if q and q["date"] > (code_max.get(code) or "00000000"):
+            rows = [x for x in rows if x["date"] != q["date"]] + [q]
+        new_rows = [x for x in rows if x["date"] > (code_max.get(code) or "00000000")]
         if not new_rows:
             skipped_stale += 1
             continue
@@ -116,7 +163,7 @@ def main() -> int:
             if not all(x.get(k) and x[k] > 0 for k in ("open", "high", "low", "close")):
                 continue
             vol = x.get("volume")
-            vol_hands = (vol / 100.0) if vol else None
+            vol_hands = vol if x.get("source") == "tencent_quote" else ((vol / 100.0) if vol else None)
             turn = x.get("turnover")
             if (turn is None or turn <= 0) and vol_hands and float_shares:
                 turn = (vol_hands * 100.0 / float_shares) * 100.0
@@ -128,7 +175,7 @@ def main() -> int:
                 "values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (x["date"], code, name, board, is_st, 0, x["open"], x["high"], x["low"], x["close"],
                  vol_hands, x.get("amount"), (turn / 100.0 if turn else None), cmv,
-                 "10jqka_kline_cloud", turn, cmv),
+                 x.get("source", "10jqka_kline_cloud"), turn, cmv),
             )
             inserted += 1
     con.commit()
