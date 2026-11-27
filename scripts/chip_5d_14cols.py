@@ -520,10 +520,10 @@ tbody tr:hover td { background:#151c27; }
 __CONCEPT__
 <div class="toolbar">
   <input id="q" placeholder="搜索代码 / 名称">
-  <select id="win"><option value="all">全部 存量获利</option><option value="lt10">&lt;10%</option><option value="10-20">10-20%</option><option value="20-50">20-50%</option><option value="50-80">50-80%</option><option value="gt80">&gt;80%</option></select>
-  <select id="streak" title="连续获利=最近N个交易日收盘价连续高于前一日；最多5日"><option value="all">连续获利</option><option value="2">2日连续获利</option><option value="3">3日连续获利</option><option value="4">4日连续获利</option><option value="5">5日连续获利</option></select>
-  <select id="flow" title="连续流入增多=新进筹码量连续高于前一日；最多5日"><option value="all">连续流入增多</option><option value="2">2日流入增多</option><option value="3">3日流入增多</option><option value="4">4日流入增多</option><option value="5">5日流入增多</option></select>
-  <select id="inflowN" title="选择查看最近N日累计新进筹码量占流通股本的比例，不改变表格排序"><option value="2">2日流入</option><option value="3">3日流入</option><option value="4">4日流入</option><option value="5">5日流入</option></select>
+  <select id="win"><option value="all">全部 存量获利</option><option value="50">&gt;50%</option><option value="60">&gt;60%</option><option value="70" selected>&gt;70%</option><option value="80">&gt;80%</option><option value="90">&gt;90%</option></select>
+  <select id="streak" title="连续获利=最近N个交易日收盘价连续高于前一日；最多5日"><option value="all">连续获利</option><option value="1">&gt;1天</option><option value="2" selected>&gt;2天</option><option value="3">&gt;3天</option><option value="4">&gt;4天</option><option value="5">&gt;5天</option></select>
+  <select id="flow" title="连续流入增多=新进筹码量连续高于前一日；最多5日"><option value="all">连续流入增多</option><option value="1">&gt;1天</option><option value="2" selected>&gt;2天</option><option value="3">&gt;3天</option><option value="4">&gt;4天</option><option value="5">&gt;5天</option></select>
+  <select id="inflowN" title="选择N日累计新进筹码量占流通股本的比例；默认按3日总计流入排行"><option value="2">2日总计流入排行</option><option value="3" selected>3日总计流入排行</option><option value="4">4日总计流入排行</option><option value="5">5日总计流入排行</option></select>
   <button id="conceptClear" class="concept-clear" style="display:none">概念：<b id="conceptName"></b> ×</button>
   <div class="pager" id="pagerTop"></div>
   <div class="count" id="count"></div>
@@ -537,7 +537,7 @@ __CONCEPT__
   <th class="stat-h position sortable" data-sort="dev_abs" rowspan="2" title="点击按距5日线绝对距离远近排序">距5日线%<span class="arrow"></span></th>
   <th class="stat-h conc sortable" data-sort="conc" rowspan="2" title="90%筹码集中度，数值越小越集中">集中度<span class="arrow"></span></th>
   <th class="stat-h winner sortable" data-sort="winner" rowspan="2">存量获利<span class="arrow"></span></th>
-  <th class="stat-h inflow sortable" data-sort="inflow" rowspan="2" title="点击按最近N日累计新进筹码量占流通股本比例排序"><span id="inflowLabel">近2日流入占比</span><span class="arrow"></span></th>
+  <th class="stat-h inflow sortable" data-sort="inflow" rowspan="2" title="点击按N日累计新进筹码量占流通股本比例排序"><span id="inflowLabel">3日流入占比</span><span class="arrow"></span></th>
   <th class="grp" colspan="6">筹码变化（近5日 + 当天）</th>
   <th class="stat-h concept-cell sortable" data-sort="concept" rowspan="2">概念<span class="arrow"></span></th>
 </tr>
@@ -552,7 +552,7 @@ __CONCEPT__
 const DATA = JSON.parse(document.getElementById('payload').textContent);
 const stocks = DATA.stocks;
 const PAGE_SIZE = DATA.page_size;
-const state = { q:'', win:'all', streak:'all', flow:'all', inN:'2', concept:'', sort:'dev_abs', dir:-1, page:1 };
+const state = { q:'', win:'70', streak:'2', flow:'2', inN:'3', concept:'', sort:'inflow', dir:-1, page:1 };
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const n0 = n => n == null ? '—' : Number(n).toLocaleString('zh-CN', {maximumFractionDigits:0});
@@ -617,11 +617,7 @@ function rowHtml(s) {
 function inWin(s) {
   if (state.win === 'all') return true;
   if (s.winner == null) return false;
-  if (state.win === 'lt10') return s.winner < 10;
-  if (state.win === '10-20') return s.winner >= 10 && s.winner < 20;
-  if (state.win === '20-50') return s.winner >= 20 && s.winner < 50;
-  if (state.win === '50-80') return s.winner >= 50 && s.winner <= 80;
-  return s.winner > 80;
+  return s.winner >= Number(state.win);
 }
 function inStreak(s) {
   if (state.streak === 'all') return true;
@@ -721,7 +717,7 @@ function render() {
   bindPager($('pagerTop'), totalPages);
   bindPager($('pagerBottom'), totalPages);
   $('tbody').innerHTML = pageRows.length ? pageRows.map(rowHtml).join('') : '<tr><td colspan="13" class="empty">没有符合条件的结果</td></tr>';
-  $('inflowLabel').textContent = `近${state.inN}日流入占比`;
+  $('inflowLabel').textContent = `${state.inN}日流入占比`;
   updateSortIndicators();
 }
 ['q','win','streak','flow'].forEach(id => {
