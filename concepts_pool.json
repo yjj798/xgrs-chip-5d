@@ -1,0 +1,13 @@
+{
+  "concepts": [
+    {"concept_id": "C001", "name": "PCB/算力硬件", "inclusion_basis": "产业级催化+连续3日资金净流入+梯队完整"},
+    {"concept_id": "C002", "name": "化工", "inclusion_basis": "事件催化+梯队完整，观察是否持续"},
+    {"concept_id": "C003", "name": "商业航天", "inclusion_basis": "事件催化+高度标存在，板块指数未共振"},
+    {"concept_id": "C004", "name": "医药（含创新药）", "inclusion_basis": "事件催化+避险属性，观察是否退潮（阶段1.5 由「创新药」更名）"},
+    {"concept_id": "N001", "name": "半导体设备与材料", "inclusion_basis": "阶段1.5 映射扩容新增：光刻胶/封装/测试/洁净室成体系，待观察持续性"},
+    {"concept_id": "N002", "name": "消费零售免税", "inclusion_basis": "阶段1.5 映射扩容新增：百货零售+免税资产整合，政策与注入双驱动"},
+    {"concept_id": "N003", "name": "算力基础设施", "inclusion_basis": "阶段1.5 映射扩容新增：算力租赁/数据中心/液冷/光模块，与 PCB 硬件分属不同环节"},
+    {"concept_id": "N004", "name": "光伏", "inclusion_basis": "阶段1.5 映射扩容新增：胶膜/设备/太空光伏，样本少"},
+    {"concept_id": "N006", "name": "机器人", "inclusion_basis": "阶段1.5 映射扩容新增：人形/工业/轴承/减速器，链条完整"}
+  ]
+}

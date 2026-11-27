@@ -1,0 +1,281 @@
+# 路径
+concepts_pool_path: "./concepts_pool.json"
+concept_mapping_path: "./concept_mapping.json"
+catalyst_path: "./catalyst.json"
+hard_flags_path: "./hard_flags.json"
+holiday_list_path: "./holiday_list.json"
+output_root: "./data"
+log_dir: "./logs"
+backup_dir: "./backup"
+backup_retention_days: 7
+archive_dir: "./archive"
+quarantine_dir: "./quarantine"
+# 版本
+config_version: "1.0"
+schema_version: "1.0"
+# 单位判断：以 order_amount/(order_volume*latest) 交叉核验为准（≈1 判元、<0.01 判万元）；
+# 量级规则（<1e6 视为万元）仅作无成交量时的兜底，不单独使用（会放大小额封单 1 万倍）。
+# 开关
+strict_mode: true
+data_source: "ths_dataapi"
+data_source_fallback: true
+slope_method: "diff"
+slope_smooth_days: 3
+hotrank_enabled: true
+catalyst_match_mode: "fuzzy"
+system_paused: false
+# 失败分支
+fallback_plan:
+  chengjiaoe_missing: "fengchengbi_zero"
+  hotrank_unavailable: "remove_item"
+  ths_xhr_unavailable: "use_pywencai_only"
+  zhaban_missing: "use_board_ladder_zhaban"
+  rps_missing: "equal_weight"
+# 连板层级映射（通用公式）
+  ths_limit_up_pool_failed: "stop_and_alert"
+  ths_zhaban_failed: "mark_missing"
+  rps_unavailable: "prep_rps_zero"
+board_level_mapping:
+  formula: "实际板数 × (实际板数 / 天数)"
+  consecutive_formula: "实际板数"
+# 概念层权重
+weight_structure: 0.3
+weight_structure_basis: "经验值，待回测校准"
+weight_quality: 0.25
+weight_quality_basis: "经验值，待回测校准"
+weight_persistence: 0.30
+weight_persistence_basis: "经验值，待回测校准"
+weight_narrative: 0.15
+weight_narrative_basis: "经验值，待回测校准"
+# 个股层权重
+weight_concept_score: 0.30
+weight_position: 0.40
+weight_seal: 0.30
+# 结构分阈值
+structure_max_board_full: 3
+structure_mid_ratio_min: 0.3
+structure_mid_ratio_max: 0.6
+structure_zhaban_penalty_high: 0.40
+structure_zhaban_penalty_mid: 0.30
+# 质量分阈值
+quality_first_seal_full_min: 30
+quality_fengdan_ratio_full: 0.02
+quality_fengdan_ratio_mid: 0.01
+quality_fengchengbi_full: 10
+quality_fengchengbi_mid: 3
+# 持续分阈值
+persist_jinjilv_full: 0.40
+persist_jinjilv_mid: 0.20
+persist_fund_days_full: 3
+persist_household_change_up: 1.2
+persist_household_change_down: 0.8
+# 叙事修正
+narrative_catalyst_policy: 3
+narrative_catalyst_event: 1
+narrative_catalyst_pure: 0
+narrative_zhengjun_bonus: 1
+# 身位分
+position_board_2plus: 3
+position_highest_board: 2
+position_mid: 1
+position_first_board: 0
+market_cap_20_30: 3
+market_cap_30_50: 2
+market_cap_above_50: 1
+market_cap_below_20: 2
+market_cap_zhengjun: 2
+low_price_below_5: 2
+low_price_5_10: 1
+low_price_cap_limit: 50
+# 封板分换手率档
+turnover_first_board_healthy_min: 0.05
+turnover_first_board_healthy_max: 0.10
+turnover_first_board_penalty: 0.15
+turnover_first_board_low: 0.40
+turnover_second_board_penalty: 0.30
+# 中军定义
+zhengjun_top_n: 3
+zhengjun_volume_ratio: 1.5
+zhengjun_refresh_days: 5
+# 预备分
+prep_catalyst_policy: 3
+prep_catalyst_event: 1
+prep_rps_turn_up: 2
+prep_rps_above: 1
+prep_zhengjun_bonus: 1
+prep_hotrank_bonus: 1
+prep_rps_absolute_threshold: 70
+# 硬伤默认
+hard_flag_default: "unknown"
+hard_flag_type:
+  减持: "hard"
+  预亏: "hard"
+  趋势坏: "soft"
+  筹码分散: "soft"
+soft_veto_discount: 0.30
+# 数据清洗
+clean_one_word_board_volume: 5000000
+clean_new_stock_days: 5
+suspension_detect_days: 5
+# 数据保留
+data_retention_days_detail: 30
+data_retention_days_aggregate: 90
+log_retention_days: 90
+# 数据生命周期
+data_lifecycle:
+  level3_retention_days: 14
+  level2_retention_days: 90
+  min_keep_recent_days: 5
+  disk_free_threshold_gb: 2
+  large_file_threshold_mb: 50
+# 概念池异常
+concept_pool_min_match_ratio: 0.5
+concept_removal_days: 10
+# 证伪基准
+falsify_baseline_window: 20
+falsify_baseline_source: "market_limit_up_next_day"
+# 回测
+backtest_roll_step: 5
+# 时间窗口
+window_definition: "含当日，往前数N个交易日"
+# 权重模式
+weight_mode: "static"
+# 斜率
+slope_std_threshold: 15
+slope_normalize_std_min: 1
+# 身位分子项归一化权重
+position_sub_weights:
+  board_identity: 0.40
+  concept_rank: 0.30
+  market_cap: 0.20
+  low_price: 0.10
+# 各维度分制
+dimension_max_scores:
+  structure: 100
+  quality: 100
+  persistence: 100
+  narrative: 100
+# 分档区间闭合方式
+interval_closure: "left_closed_right_open"
+# 排序兜底规则
+tiebreaker_rules:
+  concept_score: ["slope_normalized_desc", "limit_up_count_desc", "concept_name_pinyin_asc"]
+  stock_score: ["position_score_desc", "seal_score_desc", "market_cap_asc", "stock_code_asc"]
+  position_overlap: "take_max_not_sum"
+# 个股总分归一化
+stock_score_dimension_max:
+  concept: 100
+  position: 100
+  seal: 100
+# 炸板回封分档
+zhaban_recovery_score:
+  1: 1.0
+  2: 0.5
+  "3+": 0.0
+# 仓位分配
+position_tier:
+  top20: 0.20
+  mid30: 0.10
+  bottom50: 0.0
+# 统计方法
+stat_method:
+  group_method: "auto"
+  group_count: 4
+  baseline_weight: "equal"
+  min_sample_for_restop: 100
+  significance_level: 0.05
+  extreme_threshold: 0.20
+# 评分韧性
+scoring_resilience:
+  quality_skip_threshold: 3
+  one_word_board_weight: 0.50
+  small_sample_threshold: 3
+  small_sample_discount: 0.10
+  lone_high_board_threshold: 5
+  lone_high_board_discount: 0.50
+  fund_days_missing_mode: "hold"
+  catalyst_stale_discount: 0.05
+# 数据获取稳定性
+fetch_retry:
+  max_retries: 3
+  base_delay: 2
+  max_delay: 30
+request_throttle:
+  pywencai_interval: 2
+  eastmoney_interval: 1
+  ths_interval: 2
+data_freshness_threshold: 300
+stale_data_discount: 0.10
+degraded_days_ratio_threshold: 0.30
+# 数据源切换校准
+source_switch_calibration_days: 3
+source_switch_discount: 0.05
+# 评分校验规则
+validation_rules:
+  dimension_balance_min: 20
+  position_weak_threshold: 20
+  seal_strong_threshold: 80
+  concept_weak_threshold: 20
+  position_strong_threshold: 80
+  score_jump_threshold: 30
+  cross_section_top_n: 3
+  cross_section_top_limit_up_min: 5
+  cross_section_bottom_limit_up_max: 8
+  score_volatile_std: 20
+  score_volatile_discount: 0.10
+  low_dispersion_std: 10
+  regime_discount: 0.15
+  score_completeness_min: 0.75
+  score_incomplete_discount: 0.10
+  rank_diff_threshold: 10
+  spearman_significance: 0.05
+  spearman_negative_alert: true
+# 评分观察
+score_observation:
+  tracking_days: 10
+  distribution_quantiles: [0.25, 0.50, 0.75, 0.90]
+  distribution_history_days: 20
+  bucket_count: 4
+  cross_analysis: "concept_high_low × stock_high_low"
+  board_height_layers: ["first_board", "second_board", "third_board_plus"]
+  regime_layers: ["退潮", "修复", "主升", "冰点"]
+  decay_windows: [1, 2, 3, 5]
+  data_quality_layers:
+    high: 0.90
+    mid: 0.75
+    low: 0.0
+  attribution_top_n: 3
+  monthly_report_enabled: true
+structure_zhaban_rate_high: 0.5
+structure_zhaban_rate_mid: 0.25
+minmax_neutral_score: 50
+persist_raw_cap: 2.0
+structure_sub_height: 0.45
+structure_sub_ladder: 0.3
+structure_sub_zhaban: 0.25
+quality_sub_first_seal: 0.4
+quality_sub_fengdan: 0.35
+quality_sub_fengcheng: 0.25
+ranking_total_score_min: 40
+ranking_structure_min: 20
+persist_raw_cap_basis: "2026-11-26单日数据驱动调整，待3—5日数据确认；若持续分再次大面积同值则改为相对值（概念晋级率÷全市场涨停晋级率）"
+prep_score_max: 6
+stock_pool_max_per_concept: 2
+seal_score_min_for_pool: 20
+position_cap_uniform_n: 5
+hard_veto_lowprice_max_price: 10
+hard_veto_lowprice_fengcheng_min: 1
+position_first_seal_total_minutes: 240
+seal_fengchengbi_penalty_mild: 0.2
+seal_fengchengbi_penalty_mid: 0.3
+seal_fengchengbi_penalty_high: 0.4
+review_falsify_correct_drop: 0.03
+review_falsify_wrong_rise: 0.03
+review_min_sample: 3
+review_health_drawdown_max: 0.15
+review_history_window: 10
+trade_cost_commission: 0.0003
+trade_cost_stamp: 0.0005
+trade_cost_slippage: 0.002
+narrative_stock_discount: 0.3
+narrative_mixed_discount: 0.6

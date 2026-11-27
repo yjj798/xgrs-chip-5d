@@ -1,0 +1,62 @@
+# -*- coding: utf-8 -*-
+"""GitHub Actions 每日更新入口：涨停池 -> 日K增量 -> 筹码JSON -> 页面 index.html。"""
+from __future__ import annotations
+
+import argparse
+import os
+import subprocess
+import sys
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+BASE = Path(__file__).resolve().parents[1]
+CST = timezone(timedelta(hours=8))
+
+
+def run(script: str, *args: str, allow_fail: bool = False) -> int:
+    cmd = [sys.executable, str(BASE / "scripts" / script), *args]
+    print("$", " ".join(cmd), flush=True)
+    env = dict(os.environ)
+    env.update({
+        "XGRS_BASE": str(BASE),
+        "POOL_DB": str(BASE / "data" / "pool_quant.db"),
+        "POOL_CSV": str(BASE / "data" / "股票池.csv"),
+        "CHIP_JSON": str(BASE / "data" / "chip_6d_data.json"),
+        "DATA_ROOT": str(BASE / "data"),
+        "OUT_DIR": str(BASE / "reports"),
+        "OUT_HTML": str(BASE / "index.html"),
+        "OUT_HTML_6D": str(BASE / "reports" / "每日筹码_股票池_连续6日.html"),
+    })
+    rc = subprocess.run(cmd, cwd=str(BASE), env=env).returncode
+    if rc != 0 and not allow_fail:
+        raise SystemExit(f"{script} 失败，退出码 {rc}")
+    return rc
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--date", default=None, help="YYYY-MM-DD；缺省北京时间今天")
+    args = ap.parse_args()
+    day = args.date or datetime.now(CST).strftime("%Y-%m-%d")
+    raw = BASE / "data" / day / f"01_stocks_raw_{day}.json"
+    (BASE / "reports").mkdir(parents=True, exist_ok=True)
+
+    # 新交易日才拉涨停池；已有完整文件则保留，避免重复覆盖。
+    if not raw.exists():
+        run("fetch_limitup_cloud.py", "--date", day.replace("-", ""), allow_fail=True)
+    else:
+        print(f"涨停池已存在，跳过拉取：{raw}")
+
+    run("update_pool_db.py", allow_fail=True)
+    run("chip_6d_html.py")
+    run("chip_5d_14cols.py")
+
+    html = BASE / "index.html"
+    if not html.exists() or html.stat().st_size < 100_000:
+        raise SystemExit("index.html 未生成或过小")
+    print(f"OK index={html} size={html.stat().st_size/1024/1024:.2f}MB date={day}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
