@@ -108,11 +108,11 @@ tbody tr:hover td { background:#151c27; }
 .empty { padding:30px; color:var(--muted); text-align:center; }
 .footer-pager { padding:8px 22px 14px; display:flex; gap:6px; align-items:center; }
 .site-footer { position:absolute; left:22px; right:22px; bottom:0; padding:14px 0 20px; border-top:1px solid var(--line); display:flex; flex-direction:column; align-items:center; gap:7px; color:var(--weak); font-size:10.5px; text-align:center; }
-.site-footer .update-line { display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap; }
-.site-footer #refreshBtn { background:#1c2635; color:var(--text); border:1px solid #4b6288; border-radius:5px; padding:7px 14px; cursor:pointer; font-size:12px; }
-.site-footer #refreshBtn:hover:not(:disabled) { background:#243145; border-color:#6a87b3; }
-.site-footer #refreshBtn:disabled { color:var(--weak); cursor:wait; border-color:var(--line); }
-.site-footer #updateMsg { color:var(--muted); font-size:11px; }
+.site-footer #refreshBtn { background:none; border:0; padding:0; margin:0; color:var(--accent); font:inherit; font-size:10.5px; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
+.site-footer #refreshBtn:hover:not(:disabled) { color:#fff; }
+.site-footer #refreshBtn:disabled { color:var(--weak); cursor:wait; text-decoration:none; }
+.site-footer #updateMsg { color:var(--muted); font-size:10.5px; margin-left:6px; }
+.site-footer #updateMsg:not(:empty)::before { content:' · '; color:var(--weak); }
 .site-footer .meta b { color:var(--muted); font-weight:600; }
 .site-footer .copy { color:#4f5a6a; font-size:10px; }
 .up { color:var(--red); }
@@ -186,11 +186,7 @@ tbody tr:hover td { background:#151c27; }
 </div>
 <div class="footer-pager"><div class="pager" id="pagerBottom"></div></div>
 <footer class="site-footer">
-  <div class="update-line">
-    <button id="refreshBtn" type="button">立即更新</button>
-    <span id="updateMsg">更新包含股价、获利、概念、涨停等全部数据</span>
-  </div>
-  <div class="meta">最后更新：<b id="updatedAt">—</b> · 数据日期：<b id="latestDate">—</b></div>
+  <div class="meta"><button id="refreshBtn" type="button" title="点击触发一次云端更新">最新更新</button>：<b id="updatedAt">—</b> · 数据日期：<b id="latestDate">—</b><span id="updateMsg"></span></div>
   <div class="meta">更新内容：股价 · 筹码获利 · 概念统计 · 涨停池 · 流入/获利排行</div>
   <div class="copyright">© 2026 乐嘎嘎legaga.top版权所有</div>
 </footer>
@@ -459,7 +455,6 @@ async function waitForDeploy(beforeEtag) {
   }
   setUpdateMsg('更新任务已完成，但页面尚未切换，请稍后手动刷新');
   refreshBtn.disabled = false;
-  refreshBtn.textContent = '立即更新';
 }
 async function pollUpdate(runId, beforeEtag) {
   for (let i = 0; i < 120; i++) {
@@ -479,19 +474,16 @@ async function pollUpdate(runId, beforeEtag) {
       }
       setUpdateMsg(`更新失败（${s.conclusion || '未知原因'}），请稍后重试`);
       refreshBtn.disabled = false;
-      refreshBtn.textContent = '立即更新';
       return;
     }
     setUpdateMsg(`正在更新…（${s.status || '排队中'}）`);
   }
   setUpdateMsg('更新耗时较长，请稍后刷新页面查看');
   refreshBtn.disabled = false;
-  refreshBtn.textContent = '立即更新';
 }
 async function startUpdate() {
   if (refreshBtn.disabled) return;
   refreshBtn.disabled = true;
-  refreshBtn.textContent = '更新中…';
   setUpdateMsg('正在请求云端更新全部数据…');
   const beforeEtag = await pageEtag();
   try {
@@ -515,11 +507,9 @@ async function startUpdate() {
     }
     setUpdateMsg('已提交更新任务，请稍后刷新页面');
     refreshBtn.disabled = false;
-    refreshBtn.textContent = '立即更新';
   } catch (e) {
     setUpdateMsg(`更新请求失败：${e.message || '网络错误'}，请稍后重试`);
     refreshBtn.disabled = false;
-    refreshBtn.textContent = '立即更新';
   }
 }
 refreshBtn.addEventListener('click', startUpdate);
