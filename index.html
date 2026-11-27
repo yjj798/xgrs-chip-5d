@@ -106,10 +106,29 @@ tbody tr:hover td { background:#151c27; }
 .cold { color:var(--green); }
 .warn { color:var(--amber); }
 .ok { color:var(--green); }
+#gate { position:fixed; inset:0; z-index:99999; background:rgba(8,11,16,.94); display:flex; align-items:center; justify-content:center; padding:20px; }
+#gate.hidden { display:none; }
+#gate .box { width:min(360px,92vw); background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:24px 22px; box-shadow:0 18px 60px rgba(0,0,0,.45); }
+#gate h2 { margin:0 0 6px; font-size:20px; font-weight:650; }
+#gate p { margin:0 0 16px; color:var(--muted); font-size:12px; }
+#gate input { width:100%; background:#10151d; color:var(--text); border:1px solid var(--line); border-radius:6px; padding:10px 11px; outline:none; font-size:14px; }
+#gate input:focus { border-color:#4b6288; }
+#gate button { width:100%; margin-top:10px; background:#26364d; color:var(--text); border:1px solid #3b5272; border-radius:6px; padding:10px; cursor:pointer; font-size:14px; }
+#gate button:hover { background:#30445f; }
+#gate .err { min-height:18px; margin-top:8px; color:var(--red); font-size:12px; }
 @media (max-width:1200px) { .table-wrap { max-height:none; } }
 </style>
 </head>
 <body>
+<div id="gate">
+  <div class="box">
+    <h2>五日筹码</h2>
+    <p>请输入访问密码</p>
+    <input id="gatePwd" type="password" autocomplete="off" spellcheck="false" placeholder="访问密码">
+    <button id="gateBtn" type="button">进入</button>
+    <div class="err" id="gateErr"></div>
+  </div>
+</div>
 <header>
   <div>
     <h1>五日筹码 · 表头排序</h1>
@@ -358,6 +377,47 @@ $('conceptClear').addEventListener('click', () => {
   state.page = 1;
   render();
 });
+(() => {
+  const HASH = 'b74369740a48edd315d66684cd22a301beb95d778f4bbf01ba6da5ab216d2238';
+  const KEY = 'chip5d_ok';
+  const gate = document.getElementById('gate');
+  const pwd = document.getElementById('gatePwd');
+  const btn = document.getElementById('gateBtn');
+  const err = document.getElementById('gateErr');
+  const hide = () => {
+    gate.classList.add('hidden');
+    document.body.style.overflow = '';
+    setTimeout(() => document.getElementById('q')?.focus(), 30);
+  };
+  async function digest(s) {
+    if (!window.crypto?.subtle) throw new Error('当前浏览器不支持安全校验，请用 https 打开');
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  async function check() {
+    err.textContent = '';
+    const v = pwd.value;
+    if (!v) { err.textContent = '请输入密码'; return; }
+    try {
+      const h = await digest(v);
+      if (h === HASH) {
+        try { sessionStorage.setItem(KEY, '1'); } catch (e) {}
+        hide();
+      } else {
+        err.textContent = '密码错误';
+        pwd.value = '';
+        pwd.focus();
+      }
+    } catch (e) {
+      err.textContent = e.message || '校验失败';
+    }
+  }
+  let unlocked = false;
+  try { unlocked = sessionStorage.getItem(KEY) === '1'; } catch (e) {}
+  if (unlocked) { hide(); } else { document.body.style.overflow = 'hidden'; setTimeout(() => pwd.focus(), 60); }
+  btn.addEventListener('click', check);
+  pwd.addEventListener('keydown', e => { if (e.key === 'Enter') check(); });
+})();
 render();
 </script>
 </body>
