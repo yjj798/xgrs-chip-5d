@@ -1,4 +1,6 @@
-# 五日筹码
+<p align="center"><img src="logo-readme.png" alt="牛逼选股" width="360"></p>
+
+<h1 align="center">牛逼选股</h1>
 
 A股五日筹码可视化页面，数据由 GitHub Actions 自动更新，不依赖本机。
 
