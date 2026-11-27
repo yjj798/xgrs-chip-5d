@@ -15,7 +15,7 @@
   --green:#6fbf8f; --red:#d97b7b; --amber:#d6ad63;
 }
 * { box-sizing:border-box; }
-body { margin:0; background:var(--bg); color:var(--text); font:12.5px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif; }
+body { margin:0; min-height:100vh; position:relative; padding-bottom:160px; background:var(--bg); color:var(--text); font:12.5px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif; }
 header { padding:14px 22px 10px; border-bottom:1px solid var(--line); display:flex; justify-content:center; align-items:center; }
 h1.brand { margin:0; padding:7px 16px; background:#fff; border-radius:10px; box-shadow:0 3px 14px rgba(0,0,0,.28); line-height:0; }
 h1.brand img { display:block; height:52px; width:auto; max-width:min(70vw, 420px); }
@@ -107,7 +107,7 @@ tbody tr:hover td { background:#151c27; }
 .daycell.missing { color:var(--weak); background:#10151d; font-size:10px; }
 .empty { padding:30px; color:var(--muted); text-align:center; }
 .footer-pager { padding:8px 22px 14px; display:flex; gap:6px; align-items:center; }
-.site-footer { margin:0 22px; padding:14px 0 20px; border-top:1px solid var(--line); display:flex; flex-direction:column; align-items:center; gap:7px; color:var(--weak); font-size:10.5px; text-align:center; }
+.site-footer { position:absolute; left:22px; right:22px; bottom:0; padding:14px 0 20px; border-top:1px solid var(--line); display:flex; flex-direction:column; align-items:center; gap:7px; color:var(--weak); font-size:10.5px; text-align:center; }
 .site-footer .update-line { display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap; }
 .site-footer #refreshBtn { background:#1c2635; color:var(--text); border:1px solid #4b6288; border-radius:5px; padding:7px 14px; cursor:pointer; font-size:12px; }
 .site-footer #refreshBtn:hover:not(:disabled) { background:#243145; border-color:#6a87b3; }
@@ -134,6 +134,10 @@ tbody tr:hover td { background:#151c27; }
 #gate button:hover { background:#30445f; }
 #gate .err { min-height:18px; margin-top:8px; color:var(--red); font-size:12px; }
 @media (max-width:1200px) { .table-wrap { max-height:none; } }
+@media (max-width:900px) {
+  body { padding-bottom:0; }
+  .site-footer { position:static; left:auto; right:auto; margin:0 22px; }
+}
 </style>
 </head>
 <body>
@@ -252,7 +256,7 @@ function rowHtml(s) {
     <td class="position"><div class="dev ${devCls}">${devTxt}</div><div class="far">距5日线</div></td>
     <td class="conc"><div class="c90">${pct(s.concentration,2)}</div><div class="trend"><span class="${concTrendCls}">${concTrend}</span> · ${concLabel(s.concentration)}</div></td>
     <td class="winner"><div class="v ${winCls}">${pct(s.winner)}</div></td>
-    <td class="profit-total"><div class="p">${s.profit_cum[state.profitN] == null ? '—' : pct(s.profit_cum[state.profitN],1)}</div></td>
+    <td class="profit-total"><div class="p" title="N日每日获利比例累加（百分比点）">${s.profit_cum[state.profitN] == null ? '—' : pct(s.profit_cum[state.profitN],1)}</div></td>
     <td class="inflow"><div class="p">${s.inflow_pct[state.inN] == null ? '—' : pct(s.inflow_pct[state.inN],1)}</div></td>
     ${s.rows.map((_,i) => dayCell(s,i)).join('')}
     <td class="concept-cell">${conceptHtml(s)}</td>
