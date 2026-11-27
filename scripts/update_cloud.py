@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -12,6 +13,17 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parents[1]
 CST = timezone(timedelta(hours=8))
 INTRA_DB = BASE / ".cache" / "pool_quant_intraday.db"
+
+
+def is_holiday(day: str) -> bool:
+    path = BASE / "holiday_list.json"
+    if not path.exists():
+        return False
+    try:
+        dates = set(json.loads(path.read_text(encoding="utf-8")).get("holidays", []))
+        return day in dates
+    except Exception:
+        return False
 
 
 def run(script: str, *args: str, allow_fail: bool = False, intraday: bool = False) -> int:
@@ -42,7 +54,9 @@ def main() -> int:
     ap.add_argument("--mode", choices=("close", "intraday"), default="close", help="close=收盘最终；intraday=盘中临时")
     args = ap.parse_args()
     day = args.date or datetime.now(CST).strftime("%Y-%m-%d")
-    raw = BASE / "data" / day / f"01_stocks_raw_{day}.json"
+    if is_holiday(day):
+        print(f"{day} 是非交易日，跳过（holiday_list.json）")
+        return 0
     (BASE / "reports").mkdir(parents=True, exist_ok=True)
     intraday = args.mode == "intraday"
 
