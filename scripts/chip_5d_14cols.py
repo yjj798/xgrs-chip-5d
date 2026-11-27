@@ -401,8 +401,8 @@ def main():
 * { box-sizing:border-box; }
 body { margin:0; min-height:100vh; position:relative; padding-bottom:160px; background:var(--bg); color:var(--text); font:12.5px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif; }
 header { padding:14px 22px 10px; border-bottom:1px solid var(--line); display:flex; justify-content:center; align-items:center; }
-h1.brand { margin:0; padding:7px 16px; background:#fff; border-radius:10px; box-shadow:0 3px 14px rgba(0,0,0,.28); line-height:0; }
-h1.brand img { display:block; height:52px; width:auto; max-width:min(70vw, 420px); }
+h1.brand { margin:0; line-height:0; }
+h1.brand img { display:block; height:56px; width:auto; max-width:min(70vw, 440px); }
 .toolbar { padding:8px 22px; display:flex; gap:7px; align-items:center; flex-wrap:wrap; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--bg); z-index:40; }
 .concept-panel { margin:10px 22px 0; background:var(--panel); border:1px solid var(--line); border-radius:7px; padding:0 12px; }
 .concept-head { display:flex; gap:10px; align-items:center; padding:10px 0; cursor:pointer; list-style:none; user-select:none; }
@@ -508,8 +508,8 @@ tbody tr:hover td { background:#151c27; }
 #gate { position:fixed; inset:0; z-index:99999; background:rgba(8,11,16,.94); display:flex; align-items:center; justify-content:center; padding:20px; }
 #gate.hidden { display:none; }
 #gate .box { width:min(360px,92vw); background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:24px 22px; box-shadow:0 18px 60px rgba(0,0,0,.45); }
-#gate .gate-logo { width:max-content; max-width:100%; margin:0 auto 16px; padding:6px 12px; background:#fff; border-radius:8px; line-height:0; }
-#gate .gate-logo img { display:block; height:44px; width:auto; max-width:100%; }
+#gate .gate-logo { width:max-content; max-width:100%; margin:0 auto 16px; line-height:0; }
+#gate .gate-logo img { display:block; height:48px; width:auto; max-width:100%; }
 #gate h2 { margin:0 0 6px; font-size:20px; font-weight:650; }
 #gate p { margin:0 0 16px; color:var(--muted); font-size:12px; }
 #gate input { width:100%; background:#10151d; color:var(--text); border:1px solid var(--line); border-radius:6px; padding:10px 11px; outline:none; font-size:14px; }
@@ -527,7 +527,7 @@ tbody tr:hover td { background:#151c27; }
 <body>
 <div id="gate">
   <div class="box">
-    <div class="gate-logo"><img src="logo.png" alt="牛逼选股"></div>
+    <div class="gate-logo"><img src="logo.svg" alt="牛逼选股"></div>
     <p>请输入访问密码</p>
     <input id="gatePwd" type="password" autocomplete="off" spellcheck="false" placeholder="访问密码">
     <button id="gateBtn" type="button">进入</button>
@@ -535,7 +535,7 @@ tbody tr:hover td { background:#151c27; }
   </div>
 </div>
 <header>
-  <h1 class="brand"><img src="logo.png" alt="牛逼选股"></h1>
+  <h1 class="brand"><img src="logo.svg" alt="牛逼选股"></h1>
 </header>
 __CONCEPT__
 <div class="toolbar">
@@ -961,3 +961,4 @@ render();
 
 if __name__ == "__main__":
     main()
+

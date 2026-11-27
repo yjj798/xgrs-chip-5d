@@ -1,4 +1,4 @@
-<p align="center"><img src="logo-readme.png" alt="牛逼选股" width="360"></p>
+<p align="center"><img src="logo.svg" alt="牛逼选股" width="360"></p>
 
 <h1 align="center">牛逼选股</h1>
 
