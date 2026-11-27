@@ -54,6 +54,13 @@ def main() -> int:
     ap.add_argument("--mode", choices=("close", "intraday"), default="close", help="close=收盘最终；intraday=盘中临时")
     args = ap.parse_args()
     day = args.date or datetime.now(CST).strftime("%Y-%m-%d")
+    try:
+        day_dt = datetime.strptime(day, "%Y-%m-%d")
+    except ValueError:
+        raise SystemExit(f"日期格式错误：{day}，应为 YYYY-MM-DD")
+    if day_dt.weekday() >= 5:
+        print(f"{day} 是周末，跳过")
+        return 0
     if is_holiday(day):
         print(f"{day} 是非交易日，跳过（holiday_list.json）")
         return 0

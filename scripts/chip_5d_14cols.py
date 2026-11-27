@@ -258,7 +258,7 @@ def main():
                 winner=None, new_profit=None, prev_new_profit=None, stability=None,
                 concentration=None, conc_prev=None, conc_narrow=None, turnover=None,
                 avg_turn=None, vs5=None, cum_new=0, cum_amt=0,
-                inflow_pct={},
+                inflow_pct={}, profit_cum={},
                 consec_profit=0, consec_inflow=0,
                 rows=[dict(date=dates[i], missing=True) for i in range(6)], spark=[0] * 6,
             ))
@@ -348,35 +348,36 @@ def main():
             cum_new=sum(x["new_vol"] or 0 for x in rows),
             cum_amt=sum(x["new_amt"] or 0 for x in rows),
             rows=rows, spark=[x["new_vol"] or 0 for x in rows],
-            inflow_pct={},
+            inflow_pct={}, profit_cum={},
         ))
 
     # 默认排序：距5日线由远到近（按绝对值）
     stocks.sort(key=lambda x: (-(abs(x["dev5"]) if x["dev5"] is not None else -999), x["code"]))
 
-    # 近2-5日流入占比排名：累计新进筹码量 / 流通股本（按流通市值/收盘价估算），占比高者在前
-    for n in (2, 3, 4, 5):
+    # 近1-5日流入占比与获利总和排名：流入累计新进筹码量/流通股本；获利累加每日获利比例
+    for n in (1, 2, 3, 4, 5):
         for x in stocks:
             if x["missing"] or len(x["rows"]) < n:
                 continue
             tail = x["rows"][-n:]
             if any(r.get("missing") for r in tail):
                 continue
-            if not x.get("cap") or not x.get("price"):
-                continue
-            cum = sum(r.get("new_vol") or 0 for r in tail)
-            float_yi = x["cap"] / x["price"]
-            pct = cum / (float_yi * 1e4) * 100 if float_yi > 0 else None
-            if pct is None:
-                continue
-            x["inflow_pct"][str(n)] = round(pct, 2)
+            if x.get("cap") and x.get("price"):
+                cum = sum(r.get("new_vol") or 0 for r in tail)
+                float_yi = x["cap"] / x["price"]
+                pct = cum / (float_yi * 1e4) * 100 if float_yi > 0 else None
+                if pct is not None:
+                    x["inflow_pct"][str(n)] = round(pct, 2)
+            if all(r.get("profit") is not None for r in tail):
+                x["profit_cum"][str(n)] = round(sum(r["profit"] for r in tail), 2)
 
     concept_panel = build_concept_chart(dates, pool_concepts)
 
     missing_count = sum(1 for x in stocks if x["missing"])
     streak2 = sum(1 for x in stocks if not x["missing"] and x["consec_profit"] >= 2)
     flow2 = sum(1 for x in stocks if not x["missing"] and x["consec_inflow"] >= 2)
-    payload = dict(dates=dates, total=len(stocks), page_size=PAGE_SIZE, stocks=stocks)
+    payload = dict(dates=dates, total=len(stocks), page_size=PAGE_SIZE,
+                   generated_at=chip.get("generated_at"), stocks=stocks)
     data_json = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
 
     head_dates = "".join(f'<th class="date sortable" data-sort="day{i}" title="点击按当日流入占总筹码比例排序">{d[5:]}<span class="arrow"></span></th>' for i, d in enumerate(dates))
@@ -443,7 +444,7 @@ input:focus,select:focus { border-color:#4b6288; }
 .pager button:disabled { color:#3c4654; cursor:default; }
 .pager button.on { border-color:#4b6288; background:#1c2635; color:var(--accent); }
 .table-wrap { margin:0 22px; overflow:auto; max-height:calc(100vh - 162px); }
-table { border-collapse:separate; border-spacing:0; table-layout:fixed; width:100%; min-width:1352px; }
+table { border-collapse:separate; border-spacing:0; table-layout:fixed; width:100%; min-width:1432px; }
 th,td { border-right:1px solid var(--line); border-bottom:1px solid var(--line); }
 thead th { position:sticky; top:0; z-index:12; background:var(--panel2); color:var(--muted); font-weight:500; font-size:10.5px; padding:6px 5px; }
 thead .row2 th { top:27px; z-index:12; }
@@ -474,6 +475,8 @@ tbody tr:hover td { background:#151c27; }
 .conc .trend { font-size:9.5px; white-space:nowrap; margin-top:1px; }
 .winner { width:78px; }
 .winner .v { font-size:13px; font-weight:650; white-space:nowrap; }
+.profit-total { width:82px; }
+.profit-total .p { font-size:12.5px; font-weight:650; color:var(--gold); white-space:nowrap; }
 .inflow { width:82px; }
 .inflow .p { font-size:12.5px; font-weight:650; color:var(--accent); white-space:nowrap; }
 .concept-cell { width:124px; }
@@ -488,6 +491,14 @@ tbody tr:hover td { background:#151c27; }
 .daycell.missing { color:var(--weak); background:#10151d; font-size:10px; }
 .empty { padding:30px; color:var(--muted); text-align:center; }
 .footer-pager { padding:8px 22px 14px; display:flex; gap:6px; align-items:center; }
+.site-footer { margin:0 22px; padding:14px 0 20px; border-top:1px solid var(--line); display:flex; flex-direction:column; align-items:center; gap:7px; color:var(--weak); font-size:10.5px; text-align:center; }
+.site-footer .update-line { display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap; }
+.site-footer #refreshBtn { background:#1c2635; color:var(--text); border:1px solid #4b6288; border-radius:5px; padding:7px 14px; cursor:pointer; font-size:12px; }
+.site-footer #refreshBtn:hover:not(:disabled) { background:#243145; border-color:#6a87b3; }
+.site-footer #refreshBtn:disabled { color:var(--weak); cursor:wait; border-color:var(--line); }
+.site-footer #updateMsg { color:var(--muted); font-size:11px; }
+.site-footer .meta b { color:var(--muted); font-weight:600; }
+.site-footer .copy { color:#4f5a6a; font-size:10px; }
 .up { color:var(--red); }
 .down { color:var(--green); }
 .hot { color:var(--red); }
@@ -528,7 +539,8 @@ __CONCEPT__
   <select id="win"><option value="all">全部 存量获利</option><option value="50">&gt;50%</option><option value="60">&gt;60%</option><option value="70" selected>&gt;70%</option><option value="80">&gt;80%</option><option value="90">&gt;90%</option></select>
   <select id="streak" title="连续获利=最近N个交易日收盘价连续高于前一日；最多5日"><option value="all">连续获利</option><option value="1">&gt;1天</option><option value="2" selected>&gt;2天</option><option value="3">&gt;3天</option><option value="4">&gt;4天</option><option value="5">&gt;5天</option></select>
   <select id="flow" title="连续流入增多=新进筹码量连续高于前一日；最多5日"><option value="all">连续流入增多</option><option value="1">&gt;1天</option><option value="2" selected>&gt;2天</option><option value="3">&gt;3天</option><option value="4">&gt;4天</option><option value="5">&gt;5天</option></select>
-  <select id="inflowN" title="选择N日累计新进筹码量占流通股本的比例；默认按3日总计流入排行"><option value="2">2日总计流入排行</option><option value="3" selected>3日总计流入排行</option><option value="4">4日总计流入排行</option><option value="5">5日总计流入排行</option></select>
+  <select id="inflowN" title="N日累计新进筹码量占流通股本的比例；默认2日"><option value="1">1日流入总排行</option><option value="2" selected>2日流入总排行</option><option value="3">3日流入总排行</option><option value="4">4日流入总排行</option><option value="5">5日流入总排行</option></select>
+  <select id="profitN" title="N日每日获利比例累加，按总和降序；默认2日"><option value="1">1日获利总排行</option><option value="2" selected>2日获利总排行</option><option value="3">3日获利总排行</option><option value="4">4日获利总排行</option><option value="5">5日获利总排行</option></select>
   <button id="conceptClear" class="concept-clear" style="display:none">概念：<b id="conceptName"></b> ×</button>
   <div class="pager" id="pagerTop"></div>
   <div class="count" id="count"></div>
@@ -542,7 +554,8 @@ __CONCEPT__
   <th class="stat-h position sortable" data-sort="dev_abs" rowspan="2" title="点击按距5日线绝对距离远近排序">距5日线%<span class="arrow"></span></th>
   <th class="stat-h conc sortable" data-sort="conc" rowspan="2" title="90%筹码集中度，数值越小越集中">集中度<span class="arrow"></span></th>
   <th class="stat-h winner sortable" data-sort="winner" rowspan="2">存量获利<span class="arrow"></span></th>
-  <th class="stat-h inflow sortable" data-sort="inflow" rowspan="2" title="点击按N日累计新进筹码量占流通股本比例排序"><span id="inflowLabel">3日流入占比</span><span class="arrow"></span></th>
+  <th class="stat-h profit-total sortable" data-sort="profit_total" rowspan="2" title="点击按N日每日获利比例累加排序"><span id="profitLabel">2日获利总和</span><span class="arrow"></span></th>
+  <th class="stat-h inflow sortable" data-sort="inflow" rowspan="2" title="点击按N日累计新进筹码量占流通股本比例排序"><span id="inflowLabel">2日流入占比</span><span class="arrow"></span></th>
   <th class="grp" colspan="6">筹码变化（近5日 + 当天）</th>
   <th class="stat-h concept-cell sortable" data-sort="concept" rowspan="2">概念<span class="arrow"></span></th>
 </tr>
@@ -552,12 +565,21 @@ __CONCEPT__
 </table>
 </div>
 <div class="footer-pager"><div class="pager" id="pagerBottom"></div></div>
+<footer class="site-footer">
+  <div class="update-line">
+    <button id="refreshBtn" type="button">立即更新</button>
+    <span id="updateMsg">更新包含股价、获利、概念、涨停等全部数据</span>
+  </div>
+  <div class="meta">最后更新：<b id="updatedAt">—</b> · 数据日期：<b id="latestDate">—</b></div>
+  <div class="meta">更新内容：股价 · 筹码获利 · 概念统计 · 涨停池 · 流入/获利排行</div>
+  <div class="copyright">© 2026 乐嘎嘎legaga.top版权所有</div>
+</footer>
 <script id="payload" type="application/json">__DATA__</script>
 <script>
 const DATA = JSON.parse(document.getElementById('payload').textContent);
 const stocks = DATA.stocks;
 const PAGE_SIZE = DATA.page_size;
-const state = { q:'', win:'70', streak:'2', flow:'2', inN:'3', concept:'', sort:'inflow', dir:-1, page:1 };
+const state = { q:'', win:'70', streak:'2', flow:'2', inN:'2', profitN:'2', concept:'', sort:'inflow', dir:-1, page:1 };
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const n0 = n => n == null ? '—' : Number(n).toLocaleString('zh-CN', {maximumFractionDigits:0});
@@ -594,6 +616,7 @@ function rowHtml(s) {
       <td class="position"><div class="dev">—</div><div class="far">距5日线</div></td>
       <td class="conc"><div class="c90">—</div><div class="trend">—</div></td>
       <td class="winner"><div class="v">—</div></td>
+      <td class="profit-total"><div class="p">—</div></td>
       <td class="inflow"><div class="p">—</div></td>
       ${s.rows.map((_,i) => dayCell(s,i)).join('')}
       <td class="concept-cell">${conceptHtml(s)}</td>
@@ -613,6 +636,7 @@ function rowHtml(s) {
     <td class="position"><div class="dev ${devCls}">${devTxt}</div><div class="far">距5日线</div></td>
     <td class="conc"><div class="c90">${pct(s.concentration,2)}</div><div class="trend"><span class="${concTrendCls}">${concTrend}</span> · ${concLabel(s.concentration)}</div></td>
     <td class="winner"><div class="v ${winCls}">${pct(s.winner)}</div></td>
+    <td class="profit-total"><div class="p">${s.profit_cum[state.profitN] == null ? '—' : pct(s.profit_cum[state.profitN],1)}</div></td>
     <td class="inflow"><div class="p">${s.inflow_pct[state.inN] == null ? '—' : pct(s.inflow_pct[state.inN],1)}</div></td>
     ${s.rows.map((_,i) => dayCell(s,i)).join('')}
     <td class="concept-cell">${conceptHtml(s)}</td>
@@ -645,6 +669,7 @@ function sortVal(s, key) {
     case 'dev_abs': return s.dev5 == null ? null : Math.abs(s.dev5);
     case 'conc': return s.concentration;
     case 'winner': return s.winner;
+    case 'profit_total': return s.profit_cum[state.profitN];
     case 'concept': return s.concept || '';
     case 'inflow': return s.inflow_pct[state.inN];
     case 'cum': return s.cum_new;
@@ -721,8 +746,9 @@ function render() {
   document.querySelectorAll('.concept-link').forEach(el => el.classList.toggle('on', el.dataset.concept === state.concept));
   bindPager($('pagerTop'), totalPages);
   bindPager($('pagerBottom'), totalPages);
-  $('tbody').innerHTML = pageRows.length ? pageRows.map(rowHtml).join('') : '<tr><td colspan="13" class="empty">没有符合条件的结果</td></tr>';
+  $('tbody').innerHTML = pageRows.length ? pageRows.map(rowHtml).join('') : '<tr><td colspan="14" class="empty">没有符合条件的结果</td></tr>';
   $('inflowLabel').textContent = `${state.inN}日流入占比`;
+  $('profitLabel').textContent = `${state.profitN}日获利总和`;
   updateSortIndicators();
 }
 ['q','win','streak','flow'].forEach(id => {
@@ -734,6 +760,16 @@ function render() {
 });
 $('inflowN').addEventListener('change', e => {
   state.inN = e.target.value;
+  state.sort = 'inflow';
+  state.dir = -1;
+  state.page = 1;
+  render();
+});
+$('profitN').addEventListener('change', e => {
+  state.profitN = e.target.value;
+  state.sort = 'profit_total';
+  state.dir = -1;
+  state.page = 1;
   render();
 });
 document.querySelectorAll('th.sortable').forEach(th => {
@@ -761,6 +797,81 @@ $('conceptClear').addEventListener('click', () => {
   state.page = 1;
   render();
 });
+
+// 底部更新信息 + 一键更新
+const UPDATE_API = 'https://up.legaga.top';
+const updatedAt = $('updatedAt');
+const latestDate = $('latestDate');
+const refreshBtn = $('refreshBtn');
+const updateMsg = $('updateMsg');
+updatedAt.textContent = DATA.generated_at || '—';
+latestDate.textContent = (DATA.dates && DATA.dates.length) ? DATA.dates[DATA.dates.length - 1] : '—';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function setUpdateMsg(t) { updateMsg.textContent = t; }
+async function pollUpdate(runId) {
+  for (let i = 0; i < 120; i++) {
+    await sleep(5000);
+    let s;
+    try {
+      const r = await fetch(`${UPDATE_API}/status?id=${encodeURIComponent(runId)}`, { cache: 'no-store' });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      s = await r.json();
+    } catch (e) {
+      setUpdateMsg('更新状态查询失败，正在重试…');
+      continue;
+    }
+    if (s.status === 'completed') {
+      if (s.conclusion === 'success') {
+        setUpdateMsg('更新完成，正在加载最新页面…');
+        await sleep(10000);
+        location.replace(location.pathname + '?v=' + Date.now());
+        return;
+      }
+      setUpdateMsg(`更新失败（${s.conclusion || '未知原因'}），请稍后重试`);
+      refreshBtn.disabled = false;
+      refreshBtn.textContent = '立即更新';
+      return;
+    }
+    setUpdateMsg(`正在更新…（${s.status || '排队中'}）`);
+  }
+  setUpdateMsg('更新耗时较长，请稍后刷新页面查看');
+  refreshBtn.disabled = false;
+  refreshBtn.textContent = '立即更新';
+}
+async function startUpdate() {
+  if (refreshBtn.disabled) return;
+  refreshBtn.disabled = true;
+  refreshBtn.textContent = '更新中…';
+  setUpdateMsg('正在请求云端更新全部数据…');
+  try {
+    const r = await fetch(`${UPDATE_API}/update`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'close' })
+    });
+    let res = {};
+    try { res = await r.json(); } catch (e) {}
+    if (!r.ok || !res.ok) {
+      if (res.error === 'running' && res.run && res.run.id) {
+        setUpdateMsg('云端正在更新，等待完成…');
+        return pollUpdate(res.run.id);
+      }
+      throw new Error(res.message || res.error || `HTTP ${r.status}`);
+    }
+    if (res.run && res.run.id) {
+      setUpdateMsg('已提交更新任务，等待云端执行…');
+      return pollUpdate(res.run.id);
+    }
+    setUpdateMsg('已提交更新任务，请稍后刷新页面');
+    refreshBtn.disabled = false;
+    refreshBtn.textContent = '立即更新';
+  } catch (e) {
+    setUpdateMsg(`更新请求失败：${e.message || '网络错误'}，请稍后重试`);
+    refreshBtn.disabled = false;
+    refreshBtn.textContent = '立即更新';
+  }
+}
+refreshBtn.addEventListener('click', startUpdate);
 (() => {
   const HASH = 'b74369740a48edd315d66684cd22a301beb95d778f4bbf01ba6da5ab216d2238';
   const KEY = 'chip5d_ok';
