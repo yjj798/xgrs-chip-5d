@@ -5,18 +5,24 @@
 """
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import re
+import shutil
 import sqlite3
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import requests
 
 BASE = Path(__file__).resolve().parents[1]
 DB = Path(os.environ.get("POOL_DB", str(BASE / "data" / "pool_quant.db")))
+INTRA_DB = Path(os.environ.get("INTRA_DB", str(BASE / ".cache" / "pool_quant_intraday.db")))
+CST = timezone(timedelta(hours=8))
+TODAY = datetime.now(CST).strftime("%Y%m%d")
 KLINE_URL = "https://d.10jqka.com.cn/v6/line/hs_{code}/01/last.js"
 TENCENT_URL = "https://qt.gtimg.cn/q={q}"
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -103,7 +109,63 @@ def fetch_tencent_quotes(codes: list[str]) -> dict[str, dict]:
     return out
 
 
+def _float_shares(base: dict) -> float | None:
+    base_close = _num(base.get("close"))
+    base_cmv = _num(base.get("circ_mv_est")) or _num(base.get("circ_mv"))
+    return (base_cmv / base_close) if (base_cmv and base_close) else None
+
+
+def _insert_quote(con, code: str, name: str, board: str, x: dict, float_shares: float | None) -> bool:
+    if not all(x.get(k) and x[k] > 0 for k in ("open", "high", "low", "close")):
+        return False
+    vol = x.get("volume")
+    vol_hands = vol if x.get("source") == "tencent_quote" else ((vol / 100.0) if vol else None)
+    turn = x.get("turnover")
+    if (turn is None or turn <= 0) and vol_hands and float_shares:
+        turn = (vol_hands * 100.0 / float_shares) * 100.0
+    cmv = (x["close"] * float_shares) if float_shares else None
+    is_st = 1 if re.search(r"ST", name, re.I) else 0
+    con.execute("delete from quote_clean where trade_date=? and code=?", (x["date"], code))
+    con.execute(
+        "insert into quote_clean "
+        "(trade_date,code,name,board,is_st,is_bj,open,high,low,close,volume,amount,"
+        "turnover_rate,circ_mv,data_source,turnover_est,circ_mv_est) "
+        "values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (x["date"], code, name, board, is_st, 0, x["open"], x["high"], x["low"], x["close"],
+         vol_hands, x.get("amount"), (turn / 100.0 if turn else None), cmv,
+         x.get("source", "10jqka_kline_cloud"), turn, cmv),
+    )
+    return True
+
+
+def run_intraday(pool: dict, last: dict) -> int:
+    """盘中只改临时库，绝不把未收盘的半日 OHLCV 写入正式库。"""
+    INTRA_DB.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(DB, INTRA_DB)
+    quotes = fetch_tencent_quotes(list(pool))
+    qtoday = {c: q for c, q in quotes.items() if q["date"] == TODAY}
+    print(f"盘中快照 {len(quotes)} 只，其中当日 {len(qtoday)} 只 -> {INTRA_DB}")
+    if not qtoday:
+        print("开盘前/无当日成交，临时库保持上一交易日数据，页面不写入半日 K 线")
+        return 0
+
+    con = sqlite3.connect(INTRA_DB)
+    inserted = 0
+    for code, q in qtoday.items():
+        name, board = pool[code]
+        if _insert_quote(con, code, name, board, q, _float_shares(last.get(code) or {})):
+            inserted += 1
+    con.commit()
+    new_max = con.execute("select max(trade_date) from quote_clean").fetchone()[0]
+    con.close()
+    print(f"OK 盘中临时库写入 {inserted} 只，最新 {new_max}；正式库未改")
+    return 0
+
+
 def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--intraday", action="store_true", help="盘中模式：只更新临时库，不写正式库")
+    args = ap.parse_args()
     if not DB.exists():
         raise SystemExit(f"缺少数据库 {DB}")
     con = sqlite3.connect(DB)
@@ -120,6 +182,9 @@ def main() -> int:
     for r in con.execute("select code,max(trade_date) as d from quote_clean group by code"):
         code_max[r["code"]] = r["d"]
     con.close()
+
+    if args.intraday:
+        return run_intraday(pool, last)
 
     print(f"DB最新 {max_date}，股票 {len(pool)} 只，开始拉取日K")
     quotes = fetch_tencent_quotes(list(pool))
@@ -147,41 +212,25 @@ def main() -> int:
     skipped_stale = 0
     for code, rows in fetched.items():
         name, board = pool[code]
-        base = last.get(code) or {}
-        base_close = _num(base.get("close"))
-        base_cmv = _num(base.get("circ_mv_est")) or _num(base.get("circ_mv"))
-        float_shares = (base_cmv / base_close) if (base_cmv and base_close) else None
-        is_st = 1 if re.search(r"ST", name, re.I) else 0
+        float_shares = _float_shares(last.get(code) or {})
         q = quotes.get(code)
-        if q and q["date"] > (code_max.get(code) or "00000000"):
-            rows = [x for x in rows if x["date"] != q["date"]] + [q]
-        new_rows = [x for x in rows if x["date"] > (code_max.get(code) or "00000000")]
+        if q and q["date"] == TODAY:
+            rows = [x for x in rows if x["date"] != TODAY] + [q]
+        threshold = code_max.get(code) or "00000000"
+        new_rows = [
+            x for x in rows
+            if x["date"] > threshold or (x["date"] == TODAY and x["date"] == threshold)
+        ]
         if not new_rows:
             skipped_stale += 1
             continue
         for x in new_rows:
-            if not all(x.get(k) and x[k] > 0 for k in ("open", "high", "low", "close")):
-                continue
-            vol = x.get("volume")
-            vol_hands = vol if x.get("source") == "tencent_quote" else ((vol / 100.0) if vol else None)
-            turn = x.get("turnover")
-            if (turn is None or turn <= 0) and vol_hands and float_shares:
-                turn = (vol_hands * 100.0 / float_shares) * 100.0
-            cmv = (x["close"] * float_shares) if float_shares else None
-            con.execute(
-                "insert or ignore into quote_clean "
-                "(trade_date,code,name,board,is_st,is_bj,open,high,low,close,volume,amount,"
-                "turnover_rate,circ_mv,data_source,turnover_est,circ_mv_est) "
-                "values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                (x["date"], code, name, board, is_st, 0, x["open"], x["high"], x["low"], x["close"],
-                 vol_hands, x.get("amount"), (turn / 100.0 if turn else None), cmv,
-                 x.get("source", "10jqka_kline_cloud"), turn, cmv),
-            )
-            inserted += 1
+            if _insert_quote(con, code, name, board, x, float_shares):
+                inserted += 1
     con.commit()
     new_max = con.execute("select max(trade_date) from quote_clean").fetchone()[0]
     con.close()
-    print(f"OK 新增 {inserted} 行，失败 {len(failed)} 只，库内最新 {new_max}，无新数据 {skipped_stale} 只")
+    print(f"OK 写入 {inserted} 行，失败 {len(failed)} 只，库内最新 {new_max}，无新数据 {skipped_stale} 只")
     return 0
 
 

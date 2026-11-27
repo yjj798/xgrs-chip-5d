@@ -11,9 +11,10 @@ from pathlib import Path
 
 BASE = Path(__file__).resolve().parents[1]
 CST = timezone(timedelta(hours=8))
+INTRA_DB = BASE / ".cache" / "pool_quant_intraday.db"
 
 
-def run(script: str, *args: str, allow_fail: bool = False) -> int:
+def run(script: str, *args: str, allow_fail: bool = False, intraday: bool = False) -> int:
     cmd = [sys.executable, str(BASE / "scripts" / script), *args]
     print("$", " ".join(cmd), flush=True)
     env = dict(os.environ)
@@ -27,6 +28,8 @@ def run(script: str, *args: str, allow_fail: bool = False) -> int:
         "OUT_HTML": str(BASE / "index.html"),
         "OUT_HTML_6D": str(BASE / "reports" / "每日筹码_股票池_连续6日.html"),
     })
+    if intraday:
+        env["POOL_DB"] = str(INTRA_DB)
     rc = subprocess.run(cmd, cwd=str(BASE), env=env).returncode
     if rc != 0 and not allow_fail:
         raise SystemExit(f"{script} 失败，退出码 {rc}")
@@ -36,25 +39,32 @@ def run(script: str, *args: str, allow_fail: bool = False) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--date", default=None, help="YYYY-MM-DD；缺省北京时间今天")
+    ap.add_argument("--mode", choices=("close", "intraday"), default="close", help="close=收盘最终；intraday=盘中临时")
     args = ap.parse_args()
     day = args.date or datetime.now(CST).strftime("%Y-%m-%d")
     raw = BASE / "data" / day / f"01_stocks_raw_{day}.json"
     (BASE / "reports").mkdir(parents=True, exist_ok=True)
+    intraday = args.mode == "intraday"
 
-    # 新交易日才拉涨停池；已有完整文件则保留，避免重复覆盖。
-    if not raw.exists():
-        run("fetch_limitup_cloud.py", "--date", day.replace("-", ""), allow_fail=True)
+    # 盘中/收盘都重新拉当日涨停池；盘中空结果不覆盖已有文件。
+    fetch_args = ["--date", day.replace("-", "")]
+    if intraday:
+        fetch_args.append("--keep-existing-on-empty")
+    run("fetch_limitup_cloud.py", *fetch_args, allow_fail=True)
+
+    if intraday:
+        run("update_pool_db.py", "--intraday")
+        run("chip_6d_html.py", intraday=True)
+        run("chip_5d_14cols.py", intraday=True)
     else:
-        print(f"涨停池已存在，跳过拉取：{raw}")
-
-    run("update_pool_db.py", allow_fail=True)
-    run("chip_6d_html.py")
-    run("chip_5d_14cols.py")
+        run("update_pool_db.py", allow_fail=True)
+        run("chip_6d_html.py")
+        run("chip_5d_14cols.py")
 
     html = BASE / "index.html"
     if not html.exists() or html.stat().st_size < 100_000:
         raise SystemExit("index.html 未生成或过小")
-    print(f"OK index={html} size={html.stat().st_size/1024/1024:.2f}MB date={day}")
+    print(f"OK mode={args.mode} index={html} size={html.stat().st_size/1024/1024:.2f}MB date={day}")
     return 0
 
 

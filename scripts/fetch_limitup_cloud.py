@@ -48,6 +48,7 @@ def fetch_page(date: str, page: int, limit: int = 200) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--date", default=None, help="YYYYMMDD；缺省北京时间今天")
+    ap.add_argument("--keep-existing-on-empty", action="store_true", help="盘中空结果不覆盖已有文件")
     args = ap.parse_args()
     date = (args.date or today()).replace("-", "")
     if len(date) != 8 or not date.isdigit():
@@ -88,6 +89,9 @@ def main() -> int:
         })
 
     out = OUT_ROOT / f"{date[:4]}-{date[4:6]}-{date[6:]}" / f"01_stocks_raw_{date[:4]}-{date[4:6]}-{date[6:]}.json"
+    if not stocks and args.keep_existing_on_empty and out.exists():
+        print(f"涨停池 0 条，保留已有文件：{out}")
+        return 0
     out.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "schema_version": "1.0",
