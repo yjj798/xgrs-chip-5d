@@ -159,8 +159,8 @@ tbody tr:hover td { background:#151c27; }
   <select id="win"><option value="all">全部 存量获利</option><option value="50">&gt;50%</option><option value="60">&gt;60%</option><option value="70" selected>&gt;70%</option><option value="80">&gt;80%</option><option value="90">&gt;90%</option></select>
   <select id="streak" title="连续获利=最近N个交易日收盘价连续高于前一日；最多5日"><option value="all">连续获利</option><option value="1">&gt;1天</option><option value="2" selected>&gt;2天</option><option value="3">&gt;3天</option><option value="4">&gt;4天</option><option value="5">&gt;5天</option></select>
   <select id="flow" title="连续流入增多=新进筹码量连续高于前一日；最多5日"><option value="all">连续流入增多</option><option value="1">&gt;1天</option><option value="2" selected>&gt;2天</option><option value="3">&gt;3天</option><option value="4">&gt;4天</option><option value="5">&gt;5天</option></select>
-  <select id="inflowN" title="N日累计新进筹码量占流通股本的比例；默认2日"><option value="1">1日流入总排行</option><option value="2" selected>2日流入总排行</option><option value="3">3日流入总排行</option><option value="4">4日流入总排行</option><option value="5">5日流入总排行</option></select>
-  <select id="profitN" title="N日每日获利比例累加，按总和降序；默认2日"><option value="1">1日获利总排行</option><option value="2" selected>2日获利总排行</option><option value="3">3日获利总排行</option><option value="4">4日获利总排行</option><option value="5">5日获利总排行</option></select>
+  <select id="inflowN" title="选择1—5日累计流入总量排行；不选时不打乱默认顺序"><option value="" selected>流入排行</option><option value="1">1日流入总排行</option><option value="2">2日流入总排行</option><option value="3">3日流入总排行</option><option value="4">4日流入总排行</option><option value="5">5日流入总排行</option></select>
+  <select id="profitN" title="选择1—5日获利总和排行；不选时不打乱默认顺序"><option value="" selected>获利排行</option><option value="1">1日获利总排行</option><option value="2">2日获利总排行</option><option value="3">3日获利总排行</option><option value="4">4日获利总排行</option><option value="5">5日获利总排行</option></select>
   <button id="conceptClear" class="concept-clear" style="display:none">概念：<b id="conceptName"></b> ×</button>
   <div class="pager" id="pagerTop"></div>
   <div class="count" id="count"></div>
@@ -174,8 +174,8 @@ tbody tr:hover td { background:#151c27; }
   <th class="stat-h position sortable" data-sort="dev_abs" rowspan="2" title="点击按距5日线绝对距离远近排序">距5日线%<span class="arrow"></span></th>
   <th class="stat-h conc sortable" data-sort="conc" rowspan="2" title="90%筹码集中度，数值越小越集中">集中度<span class="arrow"></span></th>
   <th class="stat-h winner sortable" data-sort="winner" rowspan="2">存量获利<span class="arrow"></span></th>
-  <th class="stat-h profit-total sortable" data-sort="profit_total" rowspan="2" title="点击按N日每日获利比例累加排序"><span id="profitLabel">2日获利总和</span><span class="arrow"></span></th>
-  <th class="stat-h inflow sortable" data-sort="inflow" rowspan="2" title="点击按N日累计新进筹码量占流通股本比例排序"><span id="inflowLabel">2日流入占比</span><span class="arrow"></span></th>
+  <th class="stat-h profit-total sortable" data-sort="profit_total" rowspan="2" title="点击按N日每日获利比例累加排序"><span id="profitLabel">获利总和</span><span class="arrow"></span></th>
+  <th class="stat-h inflow sortable" data-sort="inflow" rowspan="2" title="点击按N日累计新进筹码量占流通股本比例排序"><span id="inflowLabel">流入占比</span><span class="arrow"></span></th>
   <th class="grp" colspan="6">筹码变化（近5日 + 当天）</th>
   <th class="stat-h concept-cell sortable" data-sort="concept" rowspan="2">概念<span class="arrow"></span></th>
 </tr>
@@ -199,7 +199,7 @@ tbody tr:hover td { background:#151c27; }
 const DATA = JSON.parse(document.getElementById('payload').textContent);
 const stocks = DATA.stocks;
 const PAGE_SIZE = DATA.page_size;
-const state = { q:'', win:'70', streak:'2', flow:'2', inN:'2', profitN:'2', concept:'', sort:'inflow', dir:-1, page:1 };
+const state = { q:'', win:'70', streak:'2', flow:'2', inN:'', profitN:'', concept:'', sort:'none', dir:1, page:1 };
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const n0 = n => n == null ? '—' : Number(n).toLocaleString('zh-CN', {maximumFractionDigits:0});
@@ -256,8 +256,8 @@ function rowHtml(s) {
     <td class="position"><div class="dev ${devCls}">${devTxt}</div><div class="far">距5日线</div></td>
     <td class="conc"><div class="c90">${pct(s.concentration,2)}</div><div class="trend"><span class="${concTrendCls}">${concTrend}</span> · ${concLabel(s.concentration)}</div></td>
     <td class="winner"><div class="v ${winCls}">${pct(s.winner)}</div></td>
-    <td class="profit-total"><div class="p" title="N日每日获利比例累加（百分比点）">${s.profit_cum[state.profitN] == null ? '—' : pct(s.profit_cum[state.profitN],1)}</div></td>
-    <td class="inflow"><div class="p">${s.inflow_pct[state.inN] == null ? '—' : pct(s.inflow_pct[state.inN],1)}</div></td>
+    <td class="profit-total"><div class="p" title="N日每日获利比例累加（百分比点）">${s.profit_cum[state.profitN || '1'] == null ? '—' : pct(s.profit_cum[state.profitN || '1'],1)}</div></td>
+    <td class="inflow"><div class="p">${s.inflow_pct[state.inN || '1'] == null ? '—' : pct(s.inflow_pct[state.inN || '1'],1)}</div></td>
     ${s.rows.map((_,i) => dayCell(s,i)).join('')}
     <td class="concept-cell">${conceptHtml(s)}</td>
   </tr>`;
@@ -289,14 +289,15 @@ function sortVal(s, key) {
     case 'dev_abs': return s.dev5 == null ? null : Math.abs(s.dev5);
     case 'conc': return s.concentration;
     case 'winner': return s.winner;
-    case 'profit_total': return s.profit_cum[state.profitN];
+    case 'profit_total': return s.profit_cum[state.profitN || '1'];
     case 'concept': return s.concept || '';
-    case 'inflow': return s.inflow_pct[state.inN];
+    case 'inflow': return s.inflow_pct[state.inN || '1'];
     case 'cum': return s.cum_new;
     default: return s.code;
   }
 }
 function cmpSort(a, b) {
+  if (state.sort === 'none') return 0;
   const av = sortVal(a, state.sort), bv = sortVal(b, state.sort);
   if (av == null && bv == null) return a.code.localeCompare(b.code);
   if (av == null) return 1;
@@ -367,8 +368,8 @@ function render() {
   bindPager($('pagerTop'), totalPages);
   bindPager($('pagerBottom'), totalPages);
   $('tbody').innerHTML = pageRows.length ? pageRows.map(rowHtml).join('') : '<tr><td colspan="14" class="empty">没有符合条件的结果</td></tr>';
-  $('inflowLabel').textContent = `${state.inN}日流入占比`;
-  $('profitLabel').textContent = `${state.profitN}日获利总和`;
+  $('inflowLabel').textContent = state.inN ? `${state.inN}日流入占比` : '流入占比';
+  $('profitLabel').textContent = state.profitN ? `${state.profitN}日获利总和` : '获利总和';
   updateSortIndicators();
 }
 ['q','win','streak','flow'].forEach(id => {
@@ -380,21 +381,23 @@ function render() {
 });
 $('inflowN').addEventListener('change', e => {
   state.inN = e.target.value;
-  state.sort = 'inflow';
-  state.dir = -1;
+  if (state.inN) { state.sort = 'inflow'; state.dir = -1; }
+  else if (state.sort === 'inflow') { state.sort = state.profitN ? 'profit_total' : 'none'; state.dir = state.profitN ? -1 : 1; }
   state.page = 1;
   render();
 });
 $('profitN').addEventListener('change', e => {
   state.profitN = e.target.value;
-  state.sort = 'profit_total';
-  state.dir = -1;
+  if (state.profitN) { state.sort = 'profit_total'; state.dir = -1; }
+  else if (state.sort === 'profit_total') { state.sort = state.inN ? 'inflow' : 'none'; state.dir = state.inN ? -1 : 1; }
   state.page = 1;
   render();
 });
 document.querySelectorAll('th.sortable').forEach(th => {
   th.addEventListener('click', () => {
     const key = th.dataset.sort;
+    if (key === 'inflow' && !state.inN) { state.inN = '1'; $('inflowN').value = '1'; }
+    if (key === 'profit_total' && !state.profitN) { state.profitN = '1'; $('profitN').value = '1'; }
     if (state.sort === key) state.dir = -state.dir;
     else {
       state.sort = key;
