@@ -540,9 +540,10 @@ tbody tr:hover td { background:#151c27; }
 __CONCEPT__
 <div class="toolbar">
   <input id="q" placeholder="搜索代码 / 名称">
-  <select id="win"><option value="all">全部 存量获利</option><option value="50">&gt;50%</option><option value="60">&gt;60%</option><option value="70">&gt;70%</option><option value="80" selected>&gt;80%</option><option value="90">&gt;90%</option></select>
-  <select id="streak" title="连续获利=最近N个交易日收盘价连续高于前一日；最多5日"><option value="all">连续获利</option><option value="1">&gt;1天</option><option value="2">&gt;2天</option><option value="3">&gt;3天</option><option value="4">&gt;4天</option><option value="5" selected>&gt;5天</option></select>
-  <select id="flow" title="连续流入增多=新进筹码量连续高于前一日；最多5日"><option value="all">连续流入增多</option><option value="1">&gt;1天</option><option value="2">&gt;2天</option><option value="3">&gt;3天</option><option value="4" selected>&gt;4天</option><option value="5">&gt;5天</option></select>
+  <select id="win"><option value="all">全部 存量获利</option><option value="50">≥50%</option><option value="60">≥60%</option><option value="70">≥70%</option><option value="80" selected>≥80%</option><option value="90">≥90%</option></select>
+  <select id="streak" title="连续获利=最近N个交易日收盘价连续高于前一日；最多5日"><option value="all">连续获利</option><option value="1" selected>≥1天</option><option value="2">≥2天</option><option value="3">≥3天</option><option value="4">≥4天</option><option value="5">≥5天</option></select>
+  <select id="flow" title="连续流入增多=新进筹码量连续高于前一日；最多5日"><option value="all">连续流入增多</option><option value="1">≥1天</option><option value="2" selected>≥2天</option><option value="3">≥3天</option><option value="4">≥4天</option><option value="5">≥5天</option></select>
+  <select id="dev" title="5日乖离=收盘价/5日均线-1；只保留大于阈值的股票"><option value="all">5日乖离</option><option value="0">&gt;0%</option><option value="3">&gt;3%</option><option value="5" selected>&gt;5%</option><option value="8">&gt;8%</option></select>
   <select id="inflowN" title="选择1—5日累计流入总量排行；不选时不打乱默认顺序"><option value="">流入排行</option><option value="1" selected>1日流入总排行</option><option value="2">2日流入总排行</option><option value="3">3日流入总排行</option><option value="4">4日流入总排行</option><option value="5">5日流入总排行</option></select>
   <select id="profitN" title="选择1—5日获利总和排行；不选时不打乱默认顺序"><option value="">获利排行</option><option value="1" selected>1日获利总排行</option><option value="2">2日获利总排行</option><option value="3">3日获利总排行</option><option value="4">4日获利总排行</option><option value="5">5日获利总排行</option></select>
   <button id="conceptClear" class="concept-clear" style="display:none">概念：<b id="conceptName"></b> ×</button>
@@ -579,7 +580,7 @@ __CONCEPT__
 const DATA = JSON.parse(document.getElementById('payload').textContent);
 const stocks = DATA.stocks;
 const PAGE_SIZE = DATA.page_size;
-const state = { q:'', win:'80', streak:'5', flow:'4', inN:'1', profitN:'1', concept:'', sort:'inflow', dir:-1, page:1 };
+const state = { q:'', win:'80', streak:'1', flow:'2', dev:'5', inN:'1', profitN:'1', concept:'', sort:'inflow', dir:-1, page:1 };
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const n0 = n => n == null ? '—' : Number(n).toLocaleString('zh-CN', {maximumFractionDigits:0});
@@ -656,6 +657,10 @@ function inFlow(s) {
   if (state.flow === 'all') return true;
   return !s.missing && (s.consec_inflow || 0) >= Number(state.flow);
 }
+function inDev(s) {
+  if (state.dev === 'all') return true;
+  return s.dev5 != null && s.dev5 > Number(state.dev);
+}
 function sortVal(s, key) {
   if (s.missing) return null;
   if (key.startsWith('day')) {
@@ -692,6 +697,7 @@ function filtered() {
   let arr = stocks.filter(s => {
     if (!inWin(s)) return false;
     if (!inStreak(s) || !inFlow(s)) return false;
+    if (!inDev(s)) return false;
     if (state.concept && (s.concept || '') !== state.concept) return false;
     if (state.q) {
       const q = state.q.toLowerCase();
@@ -752,7 +758,7 @@ function render() {
   $('profitLabel').textContent = state.profitN ? `${state.profitN}日获利总和` : '获利总和';
   updateSortIndicators();
 }
-['q','win','streak','flow'].forEach(id => {
+['q','win','streak','flow','dev'].forEach(id => {
   $(id).addEventListener(id === 'q' ? 'input' : 'change', e => {
     state[id] = e.target.value.trim ? e.target.value.trim() : e.target.value;
     state.page = 1;
