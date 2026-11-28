@@ -540,11 +540,11 @@ tbody tr:hover td { background:#151c27; }
 __CONCEPT__
 <div class="toolbar">
   <input id="q" placeholder="搜索代码 / 名称">
-  <select id="win"><option value="all">全部 存量获利</option><option value="50">&gt;50%</option><option value="60">&gt;60%</option><option value="70" selected>&gt;70%</option><option value="80">&gt;80%</option><option value="90">&gt;90%</option></select>
-  <select id="streak" title="连续获利=最近N个交易日收盘价连续高于前一日；最多5日"><option value="all">连续获利</option><option value="1">&gt;1天</option><option value="2" selected>&gt;2天</option><option value="3">&gt;3天</option><option value="4">&gt;4天</option><option value="5">&gt;5天</option></select>
-  <select id="flow" title="连续流入增多=新进筹码量连续高于前一日；最多5日"><option value="all">连续流入增多</option><option value="1">&gt;1天</option><option value="2" selected>&gt;2天</option><option value="3">&gt;3天</option><option value="4">&gt;4天</option><option value="5">&gt;5天</option></select>
-  <select id="inflowN" title="选择1—5日累计流入总量排行；不选时不打乱默认顺序"><option value="" selected>流入排行</option><option value="1">1日流入总排行</option><option value="2">2日流入总排行</option><option value="3">3日流入总排行</option><option value="4">4日流入总排行</option><option value="5">5日流入总排行</option></select>
-  <select id="profitN" title="选择1—5日获利总和排行；不选时不打乱默认顺序"><option value="" selected>获利排行</option><option value="1">1日获利总排行</option><option value="2">2日获利总排行</option><option value="3">3日获利总排行</option><option value="4">4日获利总排行</option><option value="5">5日获利总排行</option></select>
+  <select id="win"><option value="all">全部 存量获利</option><option value="50">&gt;50%</option><option value="60">&gt;60%</option><option value="70">&gt;70%</option><option value="80" selected>&gt;80%</option><option value="90">&gt;90%</option></select>
+  <select id="streak" title="连续获利=最近N个交易日收盘价连续高于前一日；最多5日"><option value="all">连续获利</option><option value="1">&gt;1天</option><option value="2">&gt;2天</option><option value="3">&gt;3天</option><option value="4">&gt;4天</option><option value="5" selected>&gt;5天</option></select>
+  <select id="flow" title="连续流入增多=新进筹码量连续高于前一日；最多5日"><option value="all">连续流入增多</option><option value="1">&gt;1天</option><option value="2">&gt;2天</option><option value="3">&gt;3天</option><option value="4" selected>&gt;4天</option><option value="5">&gt;5天</option></select>
+  <select id="inflowN" title="选择1—5日累计流入总量排行；不选时不打乱默认顺序"><option value="">流入排行</option><option value="1" selected>1日流入总排行</option><option value="2">2日流入总排行</option><option value="3">3日流入总排行</option><option value="4">4日流入总排行</option><option value="5">5日流入总排行</option></select>
+  <select id="profitN" title="选择1—5日获利总和排行；不选时不打乱默认顺序"><option value="">获利排行</option><option value="1" selected>1日获利总排行</option><option value="2">2日获利总排行</option><option value="3">3日获利总排行</option><option value="4">4日获利总排行</option><option value="5">5日获利总排行</option></select>
   <button id="conceptClear" class="concept-clear" style="display:none">概念：<b id="conceptName"></b> ×</button>
   <div class="pager" id="pagerTop"></div>
   <div class="count" id="count"></div>
@@ -579,7 +579,7 @@ __CONCEPT__
 const DATA = JSON.parse(document.getElementById('payload').textContent);
 const stocks = DATA.stocks;
 const PAGE_SIZE = DATA.page_size;
-const state = { q:'', win:'70', streak:'2', flow:'2', inN:'', profitN:'', concept:'', sort:'none', dir:1, page:1 };
+const state = { q:'', win:'80', streak:'5', flow:'4', inN:'1', profitN:'1', concept:'', sort:'inflow', dir:-1, page:1 };
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const n0 = n => n == null ? '—' : Number(n).toLocaleString('zh-CN', {maximumFractionDigits:0});
