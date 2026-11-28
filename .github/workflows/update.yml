@@ -2,8 +2,8 @@ name: 每日更新五日筹码
 
 on:
   schedule:
-    # 北京时间工作日 09:20 / 12:00 / 16:00
-    - cron: "20 1 * * 1-5"
+    # 北京时间工作日 09:35 / 12:00 / 16:00（16:00 为收盘档，唯一会发布的档位）
+    - cron: "35 1 * * 1-5"
     - cron: "0 4 * * 1-5"
     - cron: "0 8 * * 1-5"
   workflow_dispatch:
@@ -47,12 +47,24 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "schedule" ]; then
             if [ "${{ github.event.schedule }}" = "0 8 * * 1-5" ]; then
-              echo "UPDATE_MODE=close" >> "$GITHUB_ENV"
+              MODE=close
             else
-              echo "UPDATE_MODE=intraday" >> "$GITHUB_ENV"
+              MODE=intraday
             fi
           else
-            echo "UPDATE_MODE=${{ github.event.inputs.mode || 'close' }}" >> "$GITHUB_ENV"
+            MODE="${{ github.event.inputs.mode || 'close' }}"
+          fi
+          echo "UPDATE_MODE=$MODE" >> "$GITHUB_ENV"
+          echo "更新模式：$MODE（cron: ${{ github.event.schedule || '手动触发' }}）" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 取回状态库（Release state 资产）
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data
+          if ! gh release download state -p pool_quant.db -D data --clobber 2>/dev/null; then
+            echo "::error::Release state 中缺少 pool_quant.db，状态库无法恢复"
+            exit 1
           fi
 
       - name: 更新数据与页面
@@ -65,7 +77,14 @@ jobs:
             python scripts/update_cloud.py --mode "$UPDATE_MODE"
           fi
 
-      - name: 提交并推送
+      - name: 回写状态库（仅收盘）
+        if: env.UPDATE_MODE == 'close'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload state data/pool_quant.db --clobber
+
+      - name: 提交并推送（仅收盘模式）
+        if: env.UPDATE_MODE == 'close'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -74,5 +93,5 @@ jobs:
             echo "没有变化，跳过提交"
             exit 0
           fi
-          git commit -m "auto: 更新五日筹码 $(date -u +%Y-%m-%d)"
+          git commit -m "auto(close): 五日筹码 $(date -u +'%Y-%m-%d')"
           git push

@@ -1,0 +1,6 @@
+.cache/
+__pycache__/
+*.pyc
+reports/
+data/pool_quant.db
+data/chip_6d_data.json

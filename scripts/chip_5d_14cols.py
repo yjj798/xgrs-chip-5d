@@ -13,10 +13,10 @@ import sqlite3
 from collections import defaultdict
 from pathlib import Path
 
-BASE = Path(os.environ.get("XGRS_BASE", r"D:\ai\xgrs"))
+BASE = Path(os.environ.get("XGRS_BASE", str(Path(__file__).resolve().parents[1])))
 CHIP_JSON = Path(os.environ.get("CHIP_JSON", str(BASE / "reports" / "chip_6d_data.json")))
-POOL_CSV = Path(os.environ.get("POOL_CSV", r"E:\stockpool\out\股票池.csv"))
-DB = Path(os.environ.get("POOL_DB", r"E:\stockpool\engine\ingest\data\quant_v2.db"))
+POOL_CSV = Path(os.environ.get("POOL_CSV", str(BASE / "data" / "股票池.csv")))
+DB = Path(os.environ.get("POOL_DB", str(BASE / "data" / "pool_quant.db")))
 DATA_ROOT = Path(os.environ.get("DATA_ROOT", str(BASE / "data")))
 OUT = Path(os.environ.get("OUT_HTML", str(BASE / "reports" / "五日筹码_表头排序_6日_50只一页.html")))
 PAGE_SIZE = 50
@@ -202,12 +202,14 @@ def main():
 
     pool_codes = []
     pool_concepts = {}
+    board_by_code = {}
     with POOL_CSV.open(encoding="utf-8-sig") as f:
         for row in csv.DictReader(f):
             code = (row.get("代码") or "").strip()
             if code:
                 pool_codes.append(code)
                 pool_concepts[code] = primary_concept(row.get("概念"))
+                board_by_code[code] = (row.get("板块") or "").strip()
 
     con = sqlite3.connect(str(DB))
     con.row_factory = sqlite3.Row
@@ -233,6 +235,9 @@ def main():
             continue
         close = q["close"]
         if close is None or close > 8.0001:
+            continue
+        bd = board_by_code.get(code) or names.get(code, ("", ""))[1] or ""
+        if bd != "主板":
             continue
         nm = (q["name"] or names.get(code, ("", ""))[0] or code)
         if re.search(r"ST", nm, re.I) or q.get("is_st"):
@@ -350,6 +355,10 @@ def main():
             rows=rows, spark=[x["new_vol"] or 0 for x in rows],
             inflow_pct={}, profit_cum={},
         ))
+
+    offenders = [x["code"] for x in stocks if x.get("board") != "主板"]
+    if offenders:
+        raise SystemExit(f"板块约束失败（应仅主板）：{offenders[:10]}")
 
     # 默认排序：距5日线由远到近（按绝对值）
     stocks.sort(key=lambda x: (-(abs(x["dev5"]) if x["dev5"] is not None else -999), x["code"]))
@@ -572,6 +581,7 @@ __CONCEPT__
 <div class="footer-pager"><div class="pager" id="pagerBottom"></div></div>
 <footer class="site-footer">
   <div class="meta"><button id="refreshBtn" type="button" title="点击触发一次云端更新；周末/非交易日不更新数据">最新更新</button> · 数据生成：<b id="updatedAt">—</b> · 数据日期：<b id="latestDate">—</b><span id="updateMsg"></span></div>
+  <div class="meta" style="opacity:.72;font-size:11px;margin-top:6px">口径：仅主板 · 非ST · 最新价≤8元 · 流通市值&lt;200亿（市值列=流通市值，单位亿元）｜ 价格与成本线未复权（当前窗口未检出除权）｜ 行情：同花顺/腾讯双源核对</div>
   <div class="meta">更新内容：股价 · 筹码获利 · 概念统计 · 涨停池 · 流入/获利排行</div>
   <div class="copyright">© 2026 乐嘎嘎legaga.top版权所有</div>
 </footer>
@@ -885,10 +895,15 @@ async function startUpdate() {
   refreshBtn.disabled = true;
   setUpdateMsg('正在请求云端更新全部数据…');
   const beforeEtag = await pageEtag();
+  let updKey = GATE_SECRET;
+  if (!updKey) {
+    updKey = (prompt('请输入更新口令（与页面密码相同）') || '').trim();
+    if (!updKey) { setUpdateMsg('已取消更新'); refreshBtn.disabled = false; return; }
+  }
   try {
     const r = await fetch(`${UPDATE_API}/update`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Update-Key': updKey },
       body: JSON.stringify({ mode: 'close' })
     });
     let res = {};
@@ -912,8 +927,11 @@ async function startUpdate() {
   }
 }
 refreshBtn.addEventListener('click', startUpdate);
+let GATE_SECRET = '';
 (() => {
-  const HASH = 'b74369740a48edd315d66684cd22a301beb95d778f4bbf01ba6da5ab216d2238';
+  const SALT = 'xgrs-chip5d-salt-2f7c9a';
+  const ITER = 150000;
+  const HASH = 'c57fdf3df9f42e3f093b562241833f09970c8bed6d44eb6527703cd231d9995c';
   const KEY = 'chip5d_ok';
   const gate = document.getElementById('gate');
   const pwd = document.getElementById('gatePwd');
@@ -926,8 +944,11 @@ refreshBtn.addEventListener('click', startUpdate);
   };
   async function digest(s) {
     if (!window.crypto?.subtle) throw new Error('当前浏览器不支持安全校验，请用 https 打开');
-    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
-    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey('raw', enc.encode(s), 'PBKDF2', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits(
+      { name: 'PBKDF2', salt: enc.encode(SALT), iterations: ITER, hash: 'SHA-256' }, key, 256);
+    return Array.from(new Uint8Array(bits)).map(b => b.toString(16).padStart(2, '0')).join('');
   }
   async function check() {
     err.textContent = '';
@@ -936,6 +957,7 @@ refreshBtn.addEventListener('click', startUpdate);
     try {
       const h = await digest(v);
       if (h === HASH) {
+        GATE_SECRET = v;
         try { sessionStorage.setItem(KEY, '1'); } catch (e) {}
         hide();
       } else {

@@ -171,7 +171,7 @@ def main() -> int:
     con = sqlite3.connect(DB)
     con.row_factory = sqlite3.Row
     max_date = con.execute("select max(trade_date) from quote_clean").fetchone()[0]
-    pool = {r["code"]: (r["name"] or "", r["board"] or "") for r in con.execute("select code,name,board from pool_quotes")}
+    pool = {r["code"]: (r["name"] or "", r["board"] or "") for r in con.execute("select code,name,board from pool_quotes where board='主板'")}
     last = {}
     code_max = {}
     for r in con.execute(
@@ -229,6 +229,14 @@ def main() -> int:
                 inserted += 1
     con.commit()
     new_max = con.execute("select max(trade_date) from quote_clean").fetchone()[0]
+    try:
+        null_adj = con.execute(
+            "select count(*) from quote_clean where trade_date=? and (adj_ratio is null or adj_cum is null or close_adj is null)",
+            (new_max,)).fetchone()[0]
+        if null_adj:
+            print(f"[提示] {new_max} 有 {null_adj} 行复权字段为空（页面按未复权展示并在脚注标注）")
+    except sqlite3.OperationalError:
+        pass
     con.close()
     print(f"OK 写入 {inserted} 行，失败 {len(failed)} 只，库内最新 {new_max}，无新数据 {skipped_stale} 只")
     return 0

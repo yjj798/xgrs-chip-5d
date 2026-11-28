@@ -42,6 +42,9 @@ def run(script: str, *args: str, allow_fail: bool = False, intraday: bool = Fals
     })
     if intraday:
         env["POOL_DB"] = str(INTRA_DB)
+        env["CHIP_JSON"] = str(BASE / ".cache" / "chip_6d_data_intraday.json")
+        env["OUT_HTML"] = str(BASE / ".cache" / "index_intraday.html")
+        env["OUT_HTML_6D"] = str(BASE / ".cache" / "report_intraday.html")
     rc = subprocess.run(cmd, cwd=str(BASE), env=env).returncode
     if rc != 0 and not allow_fail:
         raise SystemExit(f"{script} 失败，退出码 {rc}")
@@ -82,9 +85,9 @@ def main() -> int:
         run("chip_6d_html.py")
         run("chip_5d_14cols.py")
 
-    html = BASE / "index.html"
+    html = (BASE / ".cache" / "index_intraday.html") if intraday else (BASE / "index.html")
     if not html.exists() or html.stat().st_size < 100_000:
-        raise SystemExit("index.html 未生成或过小")
+        raise SystemExit(f"{html} 未生成或过小")
     print(f"OK mode={args.mode} index={html} size={html.stat().st_size/1024/1024:.2f}MB date={day}")
     return 0
 

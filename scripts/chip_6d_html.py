@@ -17,9 +17,9 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
-BASE = Path(os.environ.get("XGRS_BASE", r"D:\ai\xgrs"))
-DB = Path(os.environ.get("POOL_DB", r"E:\stockpool\engine\ingest\data\quant_v2.db"))
-POOL_CSV = Path(os.environ.get("POOL_CSV", r"E:\stockpool\out\股票池.csv"))
+BASE = Path(os.environ.get("XGRS_BASE", str(Path(__file__).resolve().parents[1])))
+DB = Path(os.environ.get("POOL_DB", str(BASE / "data" / "pool_quant.db")))
+POOL_CSV = Path(os.environ.get("POOL_CSV", str(BASE / "data" / "股票池.csv")))
 OUT_DIR = Path(os.environ.get("OUT_DIR", str(BASE / "reports")))
 OUT_HTML = Path(os.environ.get("OUT_HTML_6D", str(OUT_DIR / "每日筹码_股票池_连续6日.html")))
 OUT_JSON = Path(os.environ.get("CHIP_JSON", str(OUT_DIR / "chip_6d_data.json")))
