@@ -159,7 +159,7 @@ tbody tr:hover td { background:#151c27; }
   <select id="win"><option value="all">全部 存量获利</option><option value="50">≥50%</option><option value="60">≥60%</option><option value="70">≥70%</option><option value="80" selected>≥80%</option><option value="90">≥90%</option></select>
   <select id="streak" title="连续获利=最近N个交易日收盘价连续高于前一日；最多5日"><option value="all">连续获利</option><option value="1" selected>≥1天</option><option value="2">≥2天</option><option value="3">≥3天</option><option value="4">≥4天</option><option value="5">≥5天</option></select>
   <select id="flow" title="连续流入增多=新进筹码量连续高于前一日；最多5日"><option value="all">连续流入增多</option><option value="1">≥1天</option><option value="2" selected>≥2天</option><option value="3">≥3天</option><option value="4">≥4天</option><option value="5">≥5天</option></select>
-  <select id="dev" title="5日乖离=收盘价/5日均线-1；只保留大于阈值的股票"><option value="all">5日乖离</option><option value="0">&gt;0%</option><option value="3">&gt;3%</option><option value="5" selected>&gt;5%</option><option value="8">&gt;8%</option></select>
+  <select id="dev" title="5日乖离=收盘价/5日均线-1；正值为站上5日线，负值为跌破5日线"><option value="all">5日乖离</option><option value="gt:0">&gt;0%</option><option value="gt:3">&gt;3%</option><option value="gt:5" selected>&gt;5%</option><option value="gt:8">&gt;8%</option><option value="lt:0">&lt;0%</option><option value="lt:-5">&lt;-5%</option><option value="lt:-8">&lt;-8%</option><option value="lt:-10">&lt;-10%</option><option value="lt:-12">&lt;-12%</option><option value="lt:-15">&lt;-15%</option></select>
   <select id="inflowN" title="选择1—5日累计流入总量排行；不选时不打乱默认顺序"><option value="">流入排行</option><option value="1" selected>1日流入总排行</option><option value="2">2日流入总排行</option><option value="3">3日流入总排行</option><option value="4">4日流入总排行</option><option value="5">5日流入总排行</option></select>
   <select id="profitN" title="选择1—5日获利总和排行；不选时不打乱默认顺序"><option value="">获利排行</option><option value="1" selected>1日获利总排行</option><option value="2">2日获利总排行</option><option value="3">3日获利总排行</option><option value="4">4日获利总排行</option><option value="5">5日获利总排行</option></select>
   <button id="conceptClear" class="concept-clear" style="display:none">概念：<b id="conceptName"></b> ×</button>
@@ -196,7 +196,7 @@ tbody tr:hover td { background:#151c27; }
 const DATA = JSON.parse(document.getElementById('payload').textContent);
 const stocks = DATA.stocks;
 const PAGE_SIZE = DATA.page_size;
-const state = { q:'', win:'80', streak:'1', flow:'2', dev:'5', inN:'1', profitN:'1', concept:'', sort:'inflow', dir:-1, page:1 };
+const state = { q:'', win:'80', streak:'1', flow:'2', dev:'gt:5', inN:'1', profitN:'1', concept:'', sort:'inflow', dir:-1, page:1 };
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const n0 = n => n == null ? '—' : Number(n).toLocaleString('zh-CN', {maximumFractionDigits:0});
@@ -275,7 +275,11 @@ function inFlow(s) {
 }
 function inDev(s) {
   if (state.dev === 'all') return true;
-  return s.dev5 != null && s.dev5 > Number(state.dev);
+  if (s.dev5 == null) return false;
+  const parts = state.dev.split(':');
+  if (parts.length !== 2) return s.dev5 > Number(state.dev);
+  const t = Number(parts[1]);
+  return parts[0] === 'lt' ? s.dev5 < t : s.dev5 > t;
 }
 function sortVal(s, key) {
   if (s.missing) return null;
