@@ -186,7 +186,7 @@ tbody tr:hover td { background:#151c27; }
 </div>
 <div class="footer-pager"><div class="pager" id="pagerBottom"></div></div>
 <footer class="site-footer">
-  <div class="meta"><button id="refreshBtn" type="button" title="点击触发一次云端更新">最新更新</button>：<b id="updatedAt">—</b> · 数据日期：<b id="latestDate">—</b><span id="updateMsg"></span></div>
+  <div class="meta"><button id="refreshBtn" type="button" title="点击触发一次云端更新；周末/非交易日不更新数据">最新更新</button> · 数据生成：<b id="updatedAt">—</b> · 数据日期：<b id="latestDate">—</b><span id="updateMsg"></span></div>
   <div class="meta">更新内容：股价 · 筹码获利 · 概念统计 · 涨停池 · 流入/获利排行</div>
   <div class="copyright">© 2026 乐嘎嘎legaga.top版权所有</div>
 </footer>
@@ -483,6 +483,11 @@ async function pollUpdate(runId, beforeEtag) {
 }
 async function startUpdate() {
   if (refreshBtn.disabled) return;
+  const day = new Date().getDay();
+  if (day === 0 || day === 6) {
+    setUpdateMsg(`今天是周末，非交易日，数据不更新；当前数据生成于 ${updatedAt.textContent}`);
+    return;
+  }
   refreshBtn.disabled = true;
   setUpdateMsg('正在请求云端更新全部数据…');
   const beforeEtag = await pageEtag();
